@@ -60,13 +60,13 @@ class App:
     COLORS = {"EMBERS": [("#110000", 40), ("#BF2100", 50), ("#FFB20F", 51), ("#FFFFAF", )],
               "PERLIN": [("#0000AD", 101), ("#5040A0", )]}
     EMBERS = {  # x_space = N_LEDS / (count - 2)
-        "big": {"count": 5, "amp": 0.5, "amp_rand": 0.1, "x_space": 50, "sigma": 15, "sigma_rand": 2,
+        "big": {"count": 5, "amp": 0.4, "amp_rand": 0.1, "x_space": 50, "sigma": 15, "sigma_rand": 2,
                 "osc_amp": 0.2, "osc_freq": 0.005, "osc_freq_rand": 0.01, "decay": 0.0, "decay_rand": 0},
         "small": {"count": 10, "amp": 0.2, "amp_rand": 0.05, "x_space": 150/8, "sigma": 5, "sigma_rand": 2,
                   "osc_amp": 0.2, "osc_freq": 0.01, "osc_freq_rand": 0.005, "decay": 0.0, "decay_rand": 0},
         "spark": {"count": 11, "amp": 0.1, "amp_rand": 0.2, "x_space": 15, "sigma": 2, "sigma_rand": 1,
                   "osc_amp": 0.2, "osc_freq": 0.01, "osc_freq_rand": 0.01,
-                  "decay": 0.001, "decay_rand": 0.01}
+                  "decay": 0.001, "decay_rand": 0.001}
     }
 
     def __init__(self, source, output):
@@ -127,7 +127,7 @@ class App:
         for i, e in enumerate(self.embers):
             if e.type == "spark" and e.age < self.frame and e.decay * (e.age - self.frame) ** 2 > 10:  # self.decay * (self.age - t)**2
                 # print("replacing ember")
-                self.embers[i] = Ember(e.i + 0.2 * (random() - 0.5), App.EMBERS["spark"],
+                self.embers[i] = Ember(e.i + int(2 * random() - 1), App.EMBERS["spark"],
                                        self.frame + 100 + 100 * random(), "spark")
 
     def build_noise(self):
@@ -218,7 +218,7 @@ class App:
         elif self.output == "PLOT":
             xvals = range(App.N_LEDS)
             self.plot.clear()
-            self.plot.plot(xvals, yvals)
+            self.plot.scatter(xvals, yvals,[4] * App.N_LEDS, marker='s')
             self.plot.axis([0, App.N_LEDS, 0, 1])
             self.canvas.draw()
             self.root.after(20, self.update)
