@@ -51,16 +51,20 @@ class App:
     LED_INVERT = False    # True to invert the signal (when using NPN transistor level shift)
     LED_CHANNEL = 0       # set to '1' for GPIOs 13, 19, 41, 45 or 53
 
+    LED_WIDTH = 8
+    LED_HEIGHT = 16
+    LED_SPACE = 4
+
     NOISE = [5, 11, 23, 47]
     # the number of step should add to 101, but if it is more, the extra colors will simply never be used
     COLORS = {"EMBERS": [("#110000", 40), ("#BF2100", 50), ("#FFB20F", 51), ("#FFFFAF", )],
               "PERLIN": [("#0000AD", 101), ("#5040A0", )]}
     EMBERS = {  # x_space = N_LEDS / (count - 2)
-        "big": {"count": 5, "amp": 0.6, "amp_rand": 0.1, "x_space": 50, "sigma": 15, "sigma_rand": 2,
-                "osc_amp": 0.2, "osc_freq": 0.01, "osc_freq_rand": 0.01, "decay": 0.0, "decay_rand": 0},
-        "small": {"count": 10, "amp": 0.15, "amp_rand": 0.01, "x_space": 150/8, "sigma": 5, "sigma_rand": 2,
-                  "osc_amp": 0.2, "osc_freq": 0.02, "osc_freq_rand": 0.01, "decay": 0.0, "decay_rand": 0},
-        "spark": {"count": 11, "amp": 0.1, "amp_rand": 0.2, "x_space": 15, "sigma": 3, "sigma_rand": 1,
+        "big": {"count": 5, "amp": 0.5, "amp_rand": 0.1, "x_space": 50, "sigma": 15, "sigma_rand": 2,
+                "osc_amp": 0.2, "osc_freq": 0.005, "osc_freq_rand": 0.01, "decay": 0.0, "decay_rand": 0},
+        "small": {"count": 10, "amp": 0.2, "amp_rand": 0.05, "x_space": 150/8, "sigma": 5, "sigma_rand": 2,
+                  "osc_amp": 0.2, "osc_freq": 0.01, "osc_freq_rand": 0.005, "decay": 0.0, "decay_rand": 0},
+        "spark": {"count": 11, "amp": 0.1, "amp_rand": 0.2, "x_space": 15, "sigma": 2, "sigma_rand": 1,
                   "osc_amp": 0.2, "osc_freq": 0.01, "osc_freq_rand": 0.01,
                   "decay": 0.001, "decay_rand": 0.01}
     }
@@ -83,7 +87,7 @@ class App:
                 self.leds.append(self.w.create_rectangle(x, 0, x + App.LED_WIDTH, App.LED_HEIGHT,
                                                          fill="white", width=0))
             self.gradient = []
-            led_colors = App.COL[SOURCE]
+            led_colors = App.COLORS[self.source]
             for i in range(len(led_colors) - 1):
                 for c in colour.Color(led_colors[i][0]).range_to(colour.Color(led_colors[i+1][0]), led_colors[i][1]):
                     self.gradient.append(c)
@@ -124,7 +128,7 @@ class App:
             if e.type == "spark" and e.age < self.frame and e.decay * (e.age - self.frame) ** 2 > 10:  # self.decay * (self.age - t)**2
                 # print("replacing ember")
                 self.embers[i] = Ember(e.i + 0.2 * (random() - 0.5), App.EMBERS["spark"],
-                                       self.frame + 100 * random(), "spark")
+                                       self.frame + 100 + 100 * random(), "spark")
 
     def build_noise(self):
         for freq in App.NOISE:
@@ -235,7 +239,7 @@ if __name__ == '__main__':
     parser.add_argument('-c', '--clear', action='store_true', help='clear the display on exit')
     parser.add_argument('-m', '--mode', choices=['EMBERS','PERLIN'],
                         default="EMBERS", help='output mode, can be either PERLIN or EMBERS')
-    parser.add_argument('-o', '--output', choices=['STRIP', 'LED', 'PLOT'],
+    parser.add_argument('-o', '--output', choices=['STRIP', 'LED', 'PLOT'], default='PLOT',
                         help='Output device, on Windows, only LED and PLOT are valid')
     args = parser.parse_args()
     output = 'STRIP'
