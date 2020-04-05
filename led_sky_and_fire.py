@@ -44,7 +44,8 @@ LED_CHANNEL = 0       # set to '1' for GPIOs 13, 19, 41, 45 or 53
 class Application:
     N_LEDS = LED_COUNT
     NOISE = [5, 11, 23, 47]
-    COL = {"EMBERS": [("#110000", 40), ("#BF2100", 50), ("#FFB20F", 51), ("#FFFFAF", )],
+    # the number of step should add to 101, but if it is more, the extra colors will simply never be used
+    COL = {"EMBERS": [("#110000", 40), ("#BF2100", 50), ("#FFB20F", 51), ("#FFFFAF", )],  
            "PERLIN": [("#0000AD", 101), ("#5040A0", )]}
     EMBERS = {  # x_space = N_LEDS / (count - 2)
         "big": {"count": 5, "amp": 0.6, "amp_rand": 0.1, "x_space": 50, "sigma": 15, "sigma_rand": 2,
