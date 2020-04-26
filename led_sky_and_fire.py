@@ -60,11 +60,11 @@ class App:
     COLORS = {"EMBERS": [("#110000", 40), ("#BF2100", 50), ("#FFB20F", 51), ("#FFFFAF", )],
               "PERLIN": [("#0000AD", 101), ("#5040A0", )]}
     EMBERS = {  # x_space = N_LEDS / (count - 2)
-        "big": {"count": 5, "amp": 0.4, "amp_rand": 0.1, "x_space": 50, "sigma": 15, "sigma_rand": 2,
+        "big": {"count": 15, "amp": 0.4, "amp_rand": 0.1, "x_space": 50, "sigma": 15, "sigma_rand": 2,
                 "osc_amp": 0.2, "osc_freq": 0.005, "osc_freq_rand": 0.01, "decay": 0.0, "decay_rand": 0},
-        "small": {"count": 10, "amp": 0.2, "amp_rand": 0.05, "x_space": 150/8, "sigma": 5, "sigma_rand": 2,
+        "small": {"count": 30, "amp": 0.2, "amp_rand": 0.05, "x_space": 150/8, "sigma": 5, "sigma_rand": 2,
                   "osc_amp": 0.2, "osc_freq": 0.01, "osc_freq_rand": 0.005, "decay": 0.0, "decay_rand": 0},
-        "spark": {"count": 11, "amp": 0.1, "amp_rand": 0.2, "x_space": 15, "sigma": 2, "sigma_rand": 1,
+        "spark": {"count": 33, "amp": 0.1, "amp_rand": 0.2, "x_space": 15, "sigma": 2, "sigma_rand": 1,
                   "osc_amp": 0.2, "osc_freq": 0.01, "osc_freq_rand": 0.01,
                   "decay": 0.001, "decay_rand": 0.001}
     }
