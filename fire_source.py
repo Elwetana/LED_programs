@@ -2,7 +2,7 @@
 
 from basic_source import BasicSource
 from random import random
-from math import sin, cos, pi, exp
+from math import cos, pi, exp
 
 
 class Ember:
@@ -24,23 +24,22 @@ class Ember:
     def get_contrib(self, x, t):
         osc = self.osc_amp * cos(self.osc_freq * t + self.osc_shift)
         return (self.amp + osc) * \
-            exp(-0.5 * ((self.x - x) * self.amp / self.sigma / (self.amp + osc) )**2 - self.decay * (self.age - t)**2)
+            exp(-0.5 * ((self.x - x) * self.amp / self.sigma / (self.amp + osc))**2 - self.decay * (self.age - t)**2)
 
 
 class FireSource(BasicSource):
 
     EMBERS = {  # x_space = N_LEDS / (count - 2)
-        "big": {"count": 15, "amp": 0.4, "amp_rand": 0.1, "x_space": 50, "sigma": 15, "sigma_rand": 2,
+        "big": {"amp": 0.4, "amp_rand": 0.1, "x_space": 50, "sigma": 15, "sigma_rand": 2,
                 "osc_amp": 0.2, "osc_freq": 0.005, "osc_freq_rand": 0.01, "decay": 0.0, "decay_rand": 0},
-        "small": {"count": 30, "amp": 0.2, "amp_rand": 0.05, "x_space": 150/8, "sigma": 5, "sigma_rand": 2,
+        "small": {"amp": 0.2, "amp_rand": 0.05, "x_space": 35, "sigma": 5, "sigma_rand": 2,
                   "osc_amp": 0.2, "osc_freq": 0.01, "osc_freq_rand": 0.005, "decay": 0.0, "decay_rand": 0},
-        "spark": {"count": 33, "amp": 0.1, "amp_rand": 0.2, "x_space": 15, "sigma": 2, "sigma_rand": 1,
-                  "osc_amp": 0.2, "osc_freq": 0.01, "osc_freq_rand": 0.01,
-                  "decay": 0.001, "decay_rand": 0.001}
+        "spark": {"amp": 0.1, "amp_rand": 0.2, "x_space": 15, "sigma": 2, "sigma_rand": 1,
+                  "osc_amp": 0.2, "osc_freq": 0.01, "osc_freq_rand": 0.01, "decay": 0.001, "decay_rand": 0.001}
     }
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, ts):
+        super().__init__(ts)
         self.embers = []
 
     def init(self, n_led):
@@ -52,23 +51,27 @@ class FireSource(BasicSource):
 
     def build_embers(self):
         for ember_type, ember_data in FireSource.EMBERS.items():
-            for i in range(ember_data["count"]):
+            x = -ember_data["x_space"] / 2
+            i = 0
+            while x < self.nLed + ember_data["x_space"] / 2:
                 self.embers.append(Ember(i, ember_data, 0, ember_type))
+                i += 1
+                x += ember_data["x_space"]
 
     def update_embers(self, frame):
         for i, e in enumerate(self.embers):
-            if e.type == "spark" and e.age < frame and e.decay * (e.age - frame) ** 2 > 10:  # self.decay * (self.age - t)**2
+            if e.type == "spark" and e.age < frame and e.decay * (e.age - frame) ** 2 > 10:
                 # print("replacing ember")
                 self.embers[i] = Ember(e.i + int(2 * random() - 1), FireSource.EMBERS["spark"],
                                        frame + 100 + 100 * random(), "spark")
 
     def get_values(self, frame):
-        self.update_embers(frame)
+        self.update_embers(self.time_speed * frame)
         values = []
         for i in range(self.nLed):
             y = 0
             for e in self.embers:
-                y += e.get_contrib(i, frame)
+                y += e.get_contrib(i, self.time_speed * frame)
             if y > 1:
                 y = 1.0
             values.append(BasicSource.gain(y, 0.25))

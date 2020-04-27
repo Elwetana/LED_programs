@@ -1,7 +1,7 @@
 #! /usr/bin/python
 
 from basic_source import BasicSource
-from math import pi, sin, cos
+from math import pi, cos
 from random import random
 
 COLORS = {"EMBERS": [("#110000", 40), ("#BF2100", 50), ("#FFB20F", 51), ("#FFFFAF",)],
@@ -11,8 +11,8 @@ COLORS = {"EMBERS": [("#110000", 40), ("#BF2100", 50), ("#FFB20F", 51), ("#FFFFA
 class PerlinSource(BasicSource):
     NOISE = [5, 11, 23, 47]
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, ts):
+        super().__init__(ts)
         self.noise = {}
         self.noise_weight = [8 / 15, 4 / 15, 2 / 15, 1 / 15]
 
@@ -24,7 +24,7 @@ class PerlinSource(BasicSource):
         return [("#0000AD", 101), ("#5040A0",)]
 
     def build_noise(self):
-        for freq in PerlinNoise.NOISE:
+        for freq in PerlinSource.NOISE:
             self.noise[freq] = []
             for i in range(freq):
                 self.noise[freq].append((2 * random() - 1.0, 2 * random() * pi))  # amplitude, phase
@@ -53,9 +53,9 @@ class PerlinSource(BasicSource):
         values = []
         for i in range(self.nLed):
             y = 0
-            for f in range(len(PerlinNoise.NOISE)):
-                freq = PerlinNoise.NOISE[f]
+            for f in range(len(PerlinSource.NOISE)):
+                freq = PerlinSource.NOISE[f]
                 x = i * (freq - 2) / self.nLed + 0.5
-                y += self.sample_noise(freq, x, freq / 1000.0, frame) * self.noise_weight[f]
+                y += self.sample_noise(freq, x, freq / 1000.0, self.time_speed * frame) * self.noise_weight[f]
             values.append(BasicSource.gain(y, 0.1))
         return values

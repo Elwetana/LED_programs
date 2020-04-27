@@ -3,6 +3,7 @@
 from basic_source import BasicSource
 from perlin_source import PerlinSource
 from fire_source import FireSource
+from math import ceil,floor
 import colour
 import time
 import argparse
@@ -15,7 +16,7 @@ if sys.platform != 'linux':
     from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
     matplotlib.use("TkAgg")
 else:
-    from rpi_ws281x import PixelStrip, Color
+    from rpi_ws281x import PixelStrip
 
 
 class App:
@@ -29,9 +30,10 @@ class App:
     LED_INVERT = False    # True to invert the signal (when using NPN transistor level shift)
     LED_CHANNEL = 0       # set to '1' for GPIOs 13, 19, 41, 45 or 53
 
-    LED_WIDTH = 8
+    LED_WIDTH = 6
     LED_HEIGHT = 16
-    LED_SPACE = 4
+    LED_SPACE = 2
+    LED_PER_ROW = 150
 
     def __init__(self, source: BasicSource, output: str):
         self.output = output
@@ -43,12 +45,15 @@ class App:
         elif self.output == "LED":
             self.root = Tk()
             self.leds = []
-            max_w = App.N_LEDS * (App.LED_WIDTH + App.LED_SPACE)
-            self.w = Canvas(self.root, width=max_w, height=App.LED_HEIGHT)
+            #max_w = App.N_LEDS * (App.LED_WIDTH + App.LED_SPACE)
+            max_w = (App.LED_WIDTH + App.LED_SPACE) * App.LED_PER_ROW
+            max_h = (App.LED_HEIGHT + App.LED_SPACE) * ceil(App.N_LEDS / App.LED_PER_ROW)
+            self.w = Canvas(self.root, width=max_w, height=max_h)
             self.w.pack()
             for i in range(App.N_LEDS):
-                x = i * (App.LED_WIDTH + App.LED_SPACE) + App.LED_SPACE // 2
-                self.leds.append(self.w.create_rectangle(x, 0, x + App.LED_WIDTH, App.LED_HEIGHT,
+                x = (i % App.LED_PER_ROW) * (App.LED_WIDTH + App.LED_SPACE) + App.LED_SPACE // 2
+                y = (i // App.LED_PER_ROW) * (App.LED_HEIGHT + App.LED_SPACE) + App.LED_SPACE // 2
+                self.leds.append(self.w.create_rectangle(x, y, x + App.LED_WIDTH, y + App.LED_HEIGHT,
                                                          fill="white", width=0))
             self.gradient = []
             led_colors = source.get_colors()
@@ -116,19 +121,21 @@ if __name__ == '__main__':
     parser.add_argument('-c', '--clear', action='store_true', help='clear the display on exit')
     parser.add_argument('-m', '--mode', choices=['EMBERS','PERLIN'],
                         default="EMBERS", help='output mode, can be either PERLIN or EMBERS')
-    parser.add_argument('-o', '--output', choices=['STRIP', 'LED', 'PLOT'], default='PLOT',
+    parser.add_argument('-o', '--output', choices=['STRIP', 'LED', 'PLOT'], default='LED',
+                        help='Output device, on Windows, only LED and PLOT are valid')
+    parser.add_argument('-t', '--timespeed', default=1, type=int,
                         help='Output device, on Windows, only LED and PLOT are valid')
     args = parser.parse_args()
     actual_output = 'STRIP'
     if sys.platform != 'linux':
         actual_output = args.output
-    source = BasicSource()
+    actual_source = BasicSource(args.timespeed)
     if args.mode == "PERLIN":
-        source = PerlinSource()
+        actual_source = PerlinSource(args.timespeed)
     elif args.mode == "EMBERS":
-        source = FireSource()
+        actual_source = FireSource(args.timespeed)
 
-    app = App(source, actual_output)
+    app = App(actual_source, actual_output)
     if actual_output == 'STRIP':
         try:
             while True:

@@ -4,8 +4,9 @@ from typing import List, Tuple
 
 
 class BasicSource:
-    def __init__(self):
+    def __init__(self, time_speed):
         self.nLed = 0
+        self.time_speed = time_speed
 
     @staticmethod
     def bias(x, w):
