@@ -55,18 +55,21 @@ class App:
                 y = (i // App.LED_PER_ROW) * (App.LED_HEIGHT + App.LED_SPACE) + App.LED_SPACE // 2
                 self.leds.append(self.w.create_rectangle(x, y, x + App.LED_WIDTH, y + App.LED_HEIGHT,
                                                          fill="white", width=0))
-            self.gradient = []
-            led_colors = source.get_colors()
-            for i in range(len(led_colors) - 1):
-                for c in colour.Color(led_colors[i][0]).range_to(colour.Color(led_colors[i+1][0]), led_colors[i][1]):
-                    self.gradient.append(c)
-        else:
+        elif self.output == "PLOT":
             self.root = Tk()
             self.figure = Figure(figsize=(10, 4), dpi=100)
             self.plot = self.figure.add_subplot(1, 1, 1)
             self.canvas = FigureCanvasTkAgg(self.figure, self.root)
             self.canvas.get_tk_widget().grid(row=0, column=0)
-
+        else:
+            print("Unknown output %s" % self.output)
+            sys.exit(-1)
+        if self.output == "LED" or self.output == "STRIP":
+            self.gradient = []
+            led_colors = source.get_colors()
+            for i in range(len(led_colors) - 1):
+                for c in colour.Color(led_colors[i][0]).range_to(colour.Color(led_colors[i + 1][0]), led_colors[i][1]):
+                    self.gradient.append(c)
         self.source = source
         self.source.init(App.N_LEDS)
         self.max_y = 0
