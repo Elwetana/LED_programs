@@ -30,6 +30,9 @@ class App:
     LED_INVERT = False    # True to invert the signal (when using NPN transistor level shift)
     LED_CHANNEL = 0       # set to '1' for GPIOs 13, 19, 41, 45 or 53
 
+    FRAME_TIME = 20       # desired time per frame in ms, fps = 1000/FRAME_TIME
+    FPS_SAMPLES = 50      # over how many samples calculate FPS
+
     LED_WIDTH = 6
     LED_HEIGHT = 16
     LED_SPACE = 2
@@ -70,10 +73,14 @@ class App:
             for i in range(len(led_colors) - 1):
                 for c in colour.Color(led_colors[i][0]).range_to(colour.Color(led_colors[i + 1][0]), led_colors[i][1]):
                     self.gradient.append(c)
+            print(self.gradient)
         self.source = source
         self.source.init(App.N_LEDS)
         self.max_y = 0
         self.frame = 0
+        self.last_update = time.time_ns()
+        self.fps = 0  # (dt1 + dt2 + dt3 ... dtn) / n
+        self.fps_times = []
         self.update()
         if self.output != "STRIP":
             self.root.mainloop()
@@ -84,8 +91,26 @@ class App:
         return int(c * 255 + 0.5 - FLOAT_ERROR)
 
     def update(self):
+        current_ns = time.time_ns()
+        delta_ms = (current_ns - self.last_update) / (10 ** 6)
+        self.last_update = current_ns
         self.frame += 1
+        self.fps_times.append(current_ns)
+        if self.frame > App.FPS_SAMPLES:
+            del self.fps_times[0]
+        if self.frame % App.FPS_SAMPLES == 0:
+            fps = App.FPS_SAMPLES/ (current_ns - self.fps_times[0]) * (10 ** 9)
+            print("FPS: %s" % fps)
+
+        sleep_time = 1
+        if delta_ms < App.FRAME_TIME:
+            sleep_time = App.FRAME_TIME - delta_ms
+        if self.output == "LED" or self.output == "PLOT":
+            pass
+        else:
+            time.sleep(sleep_time / 1000)
         yvals = self.source.get_values(self.frame)
+        #yvals = [0.2] * 500
         for y in yvals:
             if y > self.max_y:
                 self.max_y = y
@@ -99,14 +124,14 @@ class App:
         elif self.output == "LED":
             for i in range(len(self.leds)):
                 self.w.itemconfig(self.leds[i], fill=self.gradient[int(100 * yvals[i])].hex)
-            self.root.after(20, self.update)
+            self.root.after(int(sleep_time), self.update)
         elif self.output == "PLOT":
             xvals = range(App.N_LEDS)
             self.plot.clear()
             self.plot.scatter(xvals, yvals,[4] * App.N_LEDS, marker='s')
             self.plot.axis([0, App.N_LEDS, 0, 1])
             self.canvas.draw()
-            self.root.after(20, self.update)
+            self.root.after(int(sleep_time), self.update)
         else:
             pass
        # print(self.frame)
@@ -143,7 +168,6 @@ if __name__ == '__main__':
         try:
             while True:
                 app.update()
-                time.sleep(20/1000)
         except KeyboardInterrupt:
             app.turn_off_strip()
 
