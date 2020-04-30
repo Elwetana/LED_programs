@@ -60,8 +60,8 @@ class FireSource(BasicSource):
                   "osc_amp": 0.2, "osc_freq": 0.01, "osc_freq_rand": 0.01, "decay": 0.001, "decay_rand": 0.001}
     }
 
-    def __init__(self, ts):
-        super().__init__(ts)
+    def __init__(self, ts, output_type):
+        super().__init__(ts, output_type)
         self.embers = []
 
     def init(self, n_led):
@@ -87,16 +87,18 @@ class FireSource(BasicSource):
                 self.embers[i] = Ember(e.i + int(2 * random() - 1), FireSource.EMBERS["spark"],
                                        frame + 100 + 100 * random(), "spark")
 
-    def get_values(self, frame):
+    def update_leds(self, frame: int, strip):
         if frame % 4 == 0:
             self.update_embers(self.time_speed * frame)
-        values = []
-        for i in range(self.nLed):
-            y = 0
-            for e in self.embers:
-                if fabs(i - e.x) < 6 * e.sigma:
-                    y += e.get_contrib(i, self.time_speed * frame)
-            if y > 1:
-                y = 1.0
-            values.append(BasicSource.gain(y, 0.25))
-        return values
+        super().update_leds(frame, strip)
+
+    def get_gradient_index(self, i, frame):
+        y = 0
+        for e in self.embers:
+            if fabs(i - e.x) < 6 * e.sigma:
+                y += e.get_contrib(i, self.time_speed * frame)
+        if y > 1:
+            y = 1.0
+        y = BasicSource.gain(y, 0.25)
+        return int(100 * y)
+

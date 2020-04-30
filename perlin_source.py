@@ -4,15 +4,12 @@ from basic_source import BasicSource
 from math import pi, cos
 from random import random
 
-COLORS = {"EMBERS": [("#110000", 40), ("#BF2100", 50), ("#FFB20F", 51), ("#FFFFAF",)],
-          "PERLIN": [("#0000AD", 101), ("#5040A0",)]}
-
 
 class PerlinSource(BasicSource):
     NOISE = [5, 11, 23, 47]
 
-    def __init__(self, ts):
-        super().__init__(ts)
+    def __init__(self, ts, output_type):
+        super().__init__(ts, output_type)
         self.noise = {}
         self.noise_weight = [8 / 15, 4 / 15, 2 / 15, 1 / 15]
 
@@ -49,13 +46,10 @@ class PerlinSource(BasicSource):
         # print("% 2.4f\t% 2.4f\t% 2.4f\t% 2.4f" % (x, n0, n1, n))
         return n + 0.5
 
-    def get_values(self, frame):
-        values = []
-        for i in range(self.nLed):
-            y = 0
-            for f in range(len(PerlinSource.NOISE)):
-                freq = PerlinSource.NOISE[f]
-                x = i * (freq - 2) / self.nLed + 0.5
-                y += self.sample_noise(freq, x, freq / 1000.0, self.time_speed * frame) * self.noise_weight[f]
-            values.append(BasicSource.gain(y, 0.1))
-        return values
+    def get_gradient_index(self, i, frame):
+        y = 0
+        for f in range(len(PerlinSource.NOISE)):
+            freq = PerlinSource.NOISE[f]
+            x = i * (freq - 2) / self.nLed + 0.5
+            y += self.sample_noise(freq, x, freq / 1000.0, self.time_speed * frame) * self.noise_weight[f]
+        return int(100* BasicSource.gain(y, 0.1))
