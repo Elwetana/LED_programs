@@ -25,7 +25,7 @@ class App:
     LED_INVERT = False    # True to invert the signal (when using NPN transistor level shift)
     LED_CHANNEL = 0       # set to '1' for GPIOs 13, 19, 41, 45 or 53
 
-    FRAME_TIME = 20       # desired time per frame in ms, fps = 1000/FRAME_TIME
+    FRAME_TIME = 40       # desired time per frame in ms, fps = 1000/FRAME_TIME
     FPS_SAMPLES = 50      # over how many samples calculate FPS
 
     def __init__(self, source: BasicSource, output: str):
@@ -55,13 +55,11 @@ class App:
     def update(self):
         current_ns = time.time_ns()
         delta_ms = (current_ns - self.last_update) / (10 ** 6)
-        self.last_update = current_ns
         self.frame += 1
         if self.frame % App.FPS_SAMPLES == 0:
             fps = App.FPS_SAMPLES / (current_ns - self.fps_times) * (10 ** 9)
             self.fps_times = current_ns
-            print("FPS: %s" % fps) # , self.error_time / 50 <-- this is consistenly 7ms per frame
-            # self.error_time = 0
+            print("FPS: %s" % fps) #
             # if sys.platform != 'linux' and self.frame == 1000:
             #    yappi.get_func_stats().print_all()
 
@@ -70,7 +68,7 @@ class App:
             sleep_time = App.FRAME_TIME - delta_ms
         # expected_time = current_ns + sleep_time * 1000
         time.sleep(sleep_time / 1000)
-        # self.error_time += (expected_time - time.time_ns()) / (10 ** 6)
+        self.last_update = time.time_ns()
         self.source.update_leds(self.frame, self.strip)
         self.strip.show()
         #print(self.frame)
