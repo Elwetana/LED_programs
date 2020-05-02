@@ -10,16 +10,7 @@ class BasicSource:
         self.nLed = 0
         self.time_speed = time_speed
         self.gradient = []
-        led_colors = self.get_colors()
-        for i in range(len(led_colors) - 1):
-            for c in colour.Color(led_colors[i][0]).range_to(colour.Color(led_colors[i + 1][0]), led_colors[i][1]):
-                if output_type == "LED":
-                    val = (BasicSource.float2int(c.red) << 16) | (BasicSource.float2int(c.green) << 8) | BasicSource.float2int(c.blue)
-                    self.gradient.append(val)
-                elif output_type == "HEX":
-                    self.gradient.append(c.hex)
-                elif output_type == "Y":
-                    self.gradient.append(len(self.gradient) / 100)
+        self.output_type = output_type
 
     def get_colors(self) -> List[Tuple]:
         # the number of step should add to 101, but if it is more, the extra colors will simply never be used
@@ -44,6 +35,16 @@ class BasicSource:
 
     def init(self, n_led):
         self.nLed = n_led
+        led_colors = self.get_colors()
+        for i in range(len(led_colors) - 1):
+            for c in colour.Color(led_colors[i][0]).range_to(colour.Color(led_colors[i + 1][0]), led_colors[i][1]):
+                if self.output_type == "LED":
+                    val = (BasicSource.float2int(c.red) << 16) | (BasicSource.float2int(c.green) << 8) | BasicSource.float2int(c.blue)
+                    self.gradient.append(val)
+                elif self.output_type == "HEX":
+                    self.gradient.append(c.hex)
+                elif self.output_type == "Y":
+                    self.gradient.append(len(self.gradient) / 100)
 
     def update_leds(self, frame: int, strip):
         for i in range(self.nLed):
