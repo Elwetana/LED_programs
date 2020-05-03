@@ -11,20 +11,20 @@ logger = logging.getLogger(__name__)
 
 class LEDHttpHandler(BaseHTTPRequestHandler):
     def do_GET(self):
-        print(self.path)
-
-        msg = "LED SOURCE PERLIN"
-
         self.send_response(200)
         self.end_headers()
         if self.path == "/favicon.ico":
             f = open("http/favicon.ico", 'rb')
             self.wfile.write(f.read())
             return
-        f = open('http/index.html', 'r', encoding="utf-8")
-        self.wfile.write(f.read().encode())
+        if self.path == "/":
+            f = open('http/index.html', 'r', encoding="utf-8")
+            self.wfile.write(f.read().encode())
+            return
+        msg = "LED SOURCE %s" % (self.path[len("/index.html/"):]).upper()
         self.server.broadcaster.send_string(msg)
         logger.info("ZMQ message sent: %s" % msg)
+        self.wfile.write('{"result":"ok"}'.encode())
 
 
 class LEDHttpServer():

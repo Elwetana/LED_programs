@@ -112,6 +112,8 @@
             ctx = canvas.getContext('2d')
             ctx.fillStyle = hsl2rgb(h, s, l)
             ctx.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight)
+
+            document.getElementById("hsl_color").value = hsl2rgb(h, s, l)
         }
 
         function paintHueCanvas() {
@@ -192,6 +194,26 @@
 //#endregion
 
         function sourceMessage(event) {
+            let url = "index.html/" + event.target.id
+            if(event.target.id === "color") {
+                url += "?" + document.getElementById("hsl_color").value.substr(1)
+            }
+            console.log(url)
+            fetch( url, {
+                method: 'GET',                
+            })
+            .then(response => response.json())
+            .then(data => {
+                if(data.result != "ok") {
+                    alert("Error communicating with sever")
+                }
+                else {
+                    console.log("Message sent")
+                }
+            })
+            .catch((error) => {
+                alert('Error:' + error);
+            });
         }
     </script>
     <style type="text/css">
@@ -206,6 +228,9 @@
             width: 360px;
             height: 100px;
         }
+        input#hsl_color {
+            width: 200px;
+        }
 
         div#sources {
             display: flex;
@@ -216,7 +241,7 @@
         button.source {
             min-width: 200px;
             min-height: 150px;
-            width: 25vw;
+            width: 20vw;
             height: 20vh;
             margin: 1vw;
             font-size: 150%;
@@ -230,6 +255,7 @@
     <div id="sources">
         <button class="source" id="embers">Fire</button>
         <button class="source" id="perlin">Sky</button>
+        <button class="source" id="color">Colour</button>
         <button class="source" id="off">Off</button>
     </div>
     <div id="common_controls">
@@ -243,6 +269,7 @@
         <input type="range" class="hsl_input" id="saturation_input" min="0" max="100">
         <label for="saturation_input">Saturation</label>
         <canvas id="result_canvas" class="hsl_canvas"></canvas>
+        <input type="text" id="hsl_color">
     </div>
 </div>
 
