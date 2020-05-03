@@ -85,7 +85,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--clear', action='store_true', help='clear the display on exit')
     parser.add_argument('-m', '--mode', choices=['EMBERS','PERLIN','COLOR'],
-                        default="COLOR", help='output mode, can be either PERLIN or EMBERS')
+                        default="EMBERS", help='output mode, can be either PERLIN or EMBERS')
     parser.add_argument('-o', '--output', choices=['STRIP', 'LED', 'PLOT', 'DUMMY'], default='LED',
                         help='Output device, on Windows, only LED and PLOT are valid')
     parser.add_argument('-t', '--timespeed', default=1, type=int,
