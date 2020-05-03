@@ -1,6 +1,6 @@
+#!/usr/bin/python
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from multiprocessing import Process, Queue, Pipe
 import logging
 import sys
 import zmq
@@ -18,10 +18,10 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.end_headers()
         if self.path == "/favicon.ico":
-            f = open("http\\favicon.ico", 'rb')
+            f = open("http/favicon.ico", 'rb')
             self.wfile.write(f.read())
             return
-        f = open('d:\\temp\\smazat\\smazat.html', 'r', encoding="utf-8")
+        f = open('http/index.html', 'r', encoding="utf-8")
         self.wfile.write(f.read().encode())
         self.server.broadcaster.send_string(msg)
         logger.info("ZMQ message sent: %s" % msg)
@@ -29,12 +29,13 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
 
 class LEDHttpServer():
 
+    serverIP = '192.168.88.78'
     serverPort = 80
     timeout = 0.1
     zmqPort = "tcp://*:5556"
 
     def __init__(self):
-        self.server = HTTPServer(('localhost', LEDHttpServer.serverPort), LEDHttpHandler)
+        self.server = HTTPServer((LEDHttpServer.serverIP, LEDHttpServer.serverPort), LEDHttpHandler)
         self.server.timeout = LEDHttpServer.timeout
         logger.warning("HTTP server running")
 
