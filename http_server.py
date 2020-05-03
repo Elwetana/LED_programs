@@ -29,7 +29,10 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
 
 class LEDHttpServer():
 
-    serverIP = '192.168.88.78'
+    if sys.platform != 'linux':
+        serverIP = 'localhost'
+    else:
+        serverIP = '192.168.88.78'
     serverPort = 80
     timeout = 0.1
     zmqPort = "tcp://*:5556"

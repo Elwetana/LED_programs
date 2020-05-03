@@ -7,17 +7,11 @@
 
         document.addEventListener("DOMContentLoaded", function() {
             start()
-            //get keys when button is pressed
-            //document.getElementById("dispense").addEventListener("click", MakeDispatch);
-
-            //upload file when the upload button is clicked
-            //document.getElementById("upload_file").addEventListener("click", UploadFile);
-
-            //parse filename and create default values when file is selected
-            //document.getElementById("key_file").addEventListener("change", ParseFileName)
             document.getElementById("hue_input").addEventListener("change", updateLS)
             document.getElementById("saturation_input").addEventListener("change", paintLightnessCanvas)
             document.getElementById("lightness_input").addEventListener("change", paintSaturationCanvas)
+
+            document.getElementById("hue_canvas").addEventListener("touchmove", touchHSL)
         });
 
         function start() {
@@ -26,6 +20,10 @@
             console.log(hsl2rgb(240/360, 1, 1));
             paintHueCanvas()
             updateLS()
+        }
+
+        function touchHSL(event) {
+            console.log(event)
         }
 
         function paintHSLCanvas(canvasId, type) {
