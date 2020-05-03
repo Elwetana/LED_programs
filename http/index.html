@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>LED configuration page</title>
+    <script type="application/javascript">
+
+        document.addEventListener("DOMContentLoaded", function() {
+            start()
+            document.getElementById("hue_input").addEventListener("change", updateLS)
+            document.getElementById("saturation_input").addEventListener("change", paintLightnessCanvas)
+            document.getElementById("lightness_input").addEventListener("change", paintSaturationCanvas)
+
+            document.getElementById("hue_canvas").addEventListener("touchmove", touchHSL)
+        });
+
+        function start() {
+            console.log(hsl2rgb(0, 0.5, 0.5));
+            console.log(hsl2rgb(120/360, 1, 0.5));
+            console.log(hsl2rgb(240/360, 1, 1));
+            paintHueCanvas()
+            updateLS()
+        }
+
+        function touchHSL(event) {
+            console.log(event)
+        }
+
+        function paintHSLCanvas(canvasId, type) {
+            let h = parseInt(document.getElementById("hue_input").value)/360.0
+            let s = parseInt(document.getElementById("saturation_input").value)/100.0
+            let l = parseInt(document.getElementById("lightness_input").value)/100.0
+            //console.log(h, s, l, type)
+
+            let canvas = document.getElementById(canvasId)
+            let ctx = canvas.getContext('2d')
+            let xRange = canvas.clientWidth
+            let height = canvas.clientHeight
+            canvas.width = xRange
+            canvas.height = height
+            ctx.clearRect(0, 0, xRange, height)
+            for(let x = 0; x < xRange; x++) {
+                ctx.beginPath()
+                let color = "";
+                if(type === "H") color = hsl2rgb(x/xRange, 1, 0.5)
+                if(type === "S") color = hsl2rgb(h, x/xRange, l)
+                if(type === "L") color = hsl2rgb(h, s, x/xRange)
+                if(x/xRange == 0.5) color = "#FF0000"
+                ctx.strokeStyle = color
+                //console.log(x/xRange, color)
+                ctx.moveTo(x, 0)
+                ctx.lineTo(x, height - 1)
+                ctx.stroke()
+            }
+
+            canvas = document.getElementById("result_canvas")
+            ctx = canvas.getContext('2d')
+            ctx.fillStyle = hsl2rgb(h, s, l)
+            ctx.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight)
+        }
+
+        function paintHueCanvas() {
+            paintHSLCanvas("hue_canvas", "H")
+        }
+
+        function updateLS() {
+            paintLightnessCanvas()
+            paintSaturationCanvas()
+        }
+
+        function paintLightnessCanvas() {
+            paintHSLCanvas("lightness_canvas", "L")
+        }
+
+        function paintSaturationCanvas() {
+            paintHSLCanvas("saturation_canvas", "S")
+        }
+
+        /**
+         * All parameters are 0 - 1, including hue
+         */
+        function hsl2rgb(h, s, l) {
+            //copy & paste from Python Colour package
+            function formatColor(rgb) {
+                let s = "#"
+                for(c of rgb) {
+                    cc = Math.round(255 * c).toString(16).toUpperCase();
+                    if(cc.length === 1) {
+                        cc = "0" + cc
+                    }
+                    s += cc
+                }
+                return s
+            }
+
+            function _hue2rgb(v1, v2, vH) {
+                while(vH < 0) vH += 1;
+                while(vH > 1) vH -= 1;
+
+                if(6 * vH < 1) return v1 + (v2 - v1) * 6 * vH;
+                if(2 * vH < 1) return v2
+                if(3 * vH < 2) return v1 + (v2 - v1) * ((2.0 / 3) - vH) * 6
+
+                return v1
+            }
+
+            FLOAT_ERROR = 0.0000005
+            if((0.0 - FLOAT_ERROR > s) || (s > 1.0 + FLOAT_ERROR)) {
+                console.log("Saturation must be between 0 and 1.")
+                return "#000000"
+            }
+            if((0.0 - FLOAT_ERROR > l) || (l > 1.0 + FLOAT_ERROR)) {
+                console.log("Lightness must be between 0 and 1.")
+                return "#000011"
+            }
+
+            if(s == 0) {
+                return formatColor([l, l, l])
+            }
+
+            let v2 = 0
+            if(l < 0.5) {
+                v2 = l * (1.0 + s)
+            }
+            else {
+                v2 = (l + s) - (s * l)
+            }
+
+            let v1 = 2.0 * l - v2
+
+            r = _hue2rgb(v1, v2, h + (1.0 / 3))
+            g = _hue2rgb(v1, v2, h)
+            b = _hue2rgb(v1, v2, h - (1.0 / 3))
+
+            return formatColor([r, g, b])
+        }
+
+    </script>
+    <style type="text/css">
+        div#common_controls {
+            display: flex;
+            flex-direction: column;
+        }
+        input.hsl_input {
+            width: 360px;
+        }
+        canvas.hsl_canvas {
+            width: 360px;
+            height: 100px;
+        }
+
+    </style>
+</head>
+<body>
+<div>
+    <button class="source" id="embers">Fire</button>
+    <button class="source" id="perlin">Sky</button>
+    <div id="common_controls">
+        <canvas id="hue_canvas" class="hsl_canvas"></canvas>
+        <input type="range" class="hsl_input" id="hue_input" min="0" max="360">
+        <label for="hue_input">Hue</label>
+        <canvas id="lightness_canvas" class="hsl_canvas"></canvas>
+        <input type="range" class="hsl_input" id="lightness_input" min="0" max="100">
+        <label for="lightness_input">Lightness</label>
+        <canvas id="saturation_canvas" class="hsl_canvas"></canvas>
+        <input type="range" class="hsl_input" id="saturation_input" min="0" max="100">
+        <label for="saturation_input">Saturation</label>
+        <canvas id="result_canvas" class="hsl_canvas"></canvas>
+    </div>
+</div>
+
+
+</body>
+</html>

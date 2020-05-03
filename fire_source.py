@@ -2,7 +2,7 @@
 
 from basic_source import BasicSource
 from random import random
-from math import cos, pi, exp, fabs
+from math import cos, pi, exp, fabs, sqrt
 
 
 class Ember:
@@ -17,6 +17,9 @@ class Ember:
         self.sigma = ember_data["sigma"] + random() * ember_data["sigma_rand"]
         self.decay = ember_data["decay"] + ember_data["decay_rand"] * random()
         self.age = age
+        if self.decay > 0:
+            peak_age = sqrt(10.0 / self.decay)
+            self.age += peak_age
         self.type = ember_type
         self.cos_table = []
         self.contrib_table = []
