@@ -3,6 +3,7 @@
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import logging
 import sys
+import os
 import zmq
 
 
@@ -21,10 +22,19 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
             f = open('http/index.html', 'r', encoding="utf-8")
             self.wfile.write(f.read().encode())
             return
-        msg = "LED SOURCE %s" % (self.path[len("/index.html/"):]).upper()
-        self.server.broadcaster.send_string(msg)
-        logger.info("ZMQ message sent: %s" % msg)
-        self.wfile.write('{"result":"ok"}'.encode())
+        if self.path[0:7] == "/source":
+            msg = "LED SOURCE %s" % (self.path[len("/source/"):]).upper()
+            self.server.broadcaster.send_string(msg)
+            logger.info("ZMQ message sent: %s" % msg)
+            self.wfile.write('{"result":"ok"}'.encode())
+            return
+        fname = "http%s" % self.path
+        if os.path.exists(fname):
+            f = open(fname, 'r')
+            self.wfile.write(f.read().encode())
+        else:
+            self.wfile.write("FILE NOT FOUND".encode())
+            logger.warning("File not found: %s" % fname)
 
 
 class LEDHttpServer():
