@@ -18,7 +18,7 @@
 
         function start() {
             let colorPicker = new iro.ColorPicker('#picker', {
-                width: 320,
+                width: 180,
                 layoutDirection: "horizontal",
                 layout: [
                     { 
@@ -64,21 +64,10 @@
         }
     </script>
     <style type="text/css">
-        div#common_controls {
+        div#iro {
             display: flex;
             flex-direction: column;
         }
-        input.hsl_input {
-            width: 360px;
-        }
-        canvas.hsl_canvas {
-            width: 360px;
-            height: 100px;
-        }
-        input#hsl_color {
-            width: 200px;
-        }
-
         div#sources {
             display: flex;
             flex-direction: row;
@@ -86,10 +75,10 @@
             flex-wrap: wrap;
         }
         button.source {
-            min-width: 200px;
-            min-height: 150px;
+            min-width: 180px;
+            min-height: 100px;
             width: 20vw;
-            height: 20vh;
+            height: 15vh;
             margin: 1vw;
             font-size: 150%;
             background-color: slategrey;

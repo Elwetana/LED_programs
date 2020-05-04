@@ -2,3 +2,4 @@ __pycache__/
 .idea/
 *.pyc
 led_output.csv
+*.log

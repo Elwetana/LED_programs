@@ -40,7 +40,7 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
 class LEDHttpServer():
 
     if sys.platform != 'linux':
-        serverIP = 'localhost'
+        serverIP = '192.168.88.21'
     else:
         serverIP = '192.168.88.78'
     serverPort = 80
@@ -67,7 +67,8 @@ class LEDHttpServer():
 
 if __name__ == "__main__":
     print("HTTP server class")
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s: %(message)s',
+                        filename='server.log', level=logging.INFO)
     server = LEDHttpServer()
     server.start()
     while True:
