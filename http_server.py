@@ -22,8 +22,9 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
             f = open('http/index.html', 'r', encoding="utf-8")
             s = f.read()
             if sys.platform == "linux":
-                sysinfo = LEDHttpHandler.get_sys_info()
-                s.replace("{{sysinfo}}", sysinfo)
+                systeminfo = LEDHttpHandler.get_sys_info()
+                # print(systeminfo)
+                s = s.replace("{{systeminfo}}", systeminfo)
             self.wfile.write(s.encode())
             return
         if self.path[0:7] == "/source":
@@ -44,10 +45,10 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
     def get_sys_info():
         fproc = open("/proc/loadavg")
         proc = fproc.readline().split(" ")
-        proc_info = "<tr><td colspan=3>CPU Load</td></tr>\n"
-        proc_info += "<tr><td>" + "<td></td>".join(proc[0:2]) + "</td></tr>\n"
+        proc_info = "<tr><td>CPU Load:</td>"
+        proc_info += "<td>" + "</td><td>".join(proc[0:3]) + "</td></tr>\n"
         ftemp = open("/sys/class/thermal/thermal_zone0/temp")
-        temp_info = "<tr><td colspan=3>CPU temperature: %s°C</td></tr>\n" % (int(ftemp.readline()) / 1000)
+        temp_info = "<tr><td colspan=4>CPU temperature: %s°C</td></tr>\n" % (int(ftemp.readline()) / 1000)
         return "<table>\n" + proc_info + temp_info + "</table>\n"
 
 
