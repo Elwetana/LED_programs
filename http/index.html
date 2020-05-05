@@ -16,7 +16,23 @@
             }
         });
 
+        let state = {{state}}
+
         function start() {
+            initColorPicker()
+            updateState()
+        }
+
+        function updateState() {
+            let sources = document.getElementsByClassName("source")
+            for(let s of sources) {
+                s.className = "source unselected"
+            }
+            document.getElementById(state.source).className = "source selected"
+            document.getElementById("hsl_color").value = state.color
+        }
+
+        function initColorPicker() {
             let colorPicker = new iro.ColorPicker('#picker', {
                 width: 180,
                 layoutDirection: "horizontal",
@@ -36,16 +52,19 @@
             });
             colorPicker.on('color:change', function(color) {
                 // log the current color as a HEX string
-                document.getElementById("hsl_color").value = color.hexString;
+                document.getElementById("hsl_color").value = color.hexString.toUpperCase();
             });
         }
 
         function sourceMessage(event) {
-            let url = "source/" + event.target.id
-            if(event.target.id === "color") {
-                url += "?" + document.getElementById("hsl_color").value.substr(1)
+            let source = event.target.id
+            let url = "source/" + source
+            state.source = source
+            if(source === "color") {
+                let color = document.getElementById("hsl_color").value
+                url += "?" + color.substr(1)
+                state.color = color
             }
-            console.log(url)
             fetch( url, {
                 method: 'GET',                
             })
@@ -56,6 +75,7 @@
                 }
                 else {
                     console.log("Message sent")
+                    updateState()
                 }
             })
             .catch((error) => {
@@ -81,7 +101,14 @@
             height: 15vh;
             margin: 1vw;
             font-size: 150%;
+        }
+
+        button.unselected {
             background-color: slategrey;
+        }
+
+        button.selected {
+            background-color: lightgray;
         }
 
     </style>
@@ -89,10 +116,10 @@
 <body>
 <div>
     <div id="sources">
-        <button class="source" id="embers">Fire</button>
-        <button class="source" id="perlin">Sky</button>
-        <button class="source" id="color">Colour</button>
-        <button class="source" id="off">Off</button>
+        <button class="source unselected" id="embers">Fire</button>
+        <button class="source unselected" id="perlin">Sky</button>
+        <button class="source unselected" id="color">Colour</button>
+        <button class="source unselected" id="off">Off</button>
     </div>
     <div id="iro">
         <div id="picker"></div>

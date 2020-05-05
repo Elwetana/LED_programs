@@ -2,6 +2,7 @@
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import logging
+import json
 import sys
 import os
 import zmq
@@ -70,6 +71,7 @@ class LEDHttpServer():
         context = zmq.Context()
         self.server.broadcaster = context.socket(zmq.PUB)
         self.server.broadcaster.bind(LEDHttpServer.zmqPort)
+        self.server.state = {"state": "embers", "color": "#FFFFFF"}
         
         try:
             while True:
