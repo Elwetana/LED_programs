@@ -26,13 +26,20 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
                 systeminfo = LEDHttpHandler.get_sys_info()
                 # print(systeminfo)
                 s = s.replace("{{systeminfo}}", systeminfo)
+            s = s.replace("{{state}}", json.dumps(self.server.state))
             self.wfile.write(s.encode())
             return
         if self.path[0:7] == "/source":
-            msg = "LED SOURCE %s" % (self.path[len("/source/"):]).upper()
+            payload = (self.path[len("/source/"):]).upper()
+            msg = "LED SOURCE %s" % payload
             self.server.broadcaster.send_string(msg)
             logger.info("ZMQ message sent: %s" % msg)
             self.wfile.write('{"result":"ok"}'.encode())
+            l = payload.split("?")
+            self.server.state["source"] = l[0].lower()
+            if len(l) > 1:
+                self.server.state["color"] = "#" + l[1]
+
             return
         fname = "http%s" % self.path
         if os.path.exists(fname):
@@ -72,7 +79,7 @@ class LEDHttpServer():
         context = zmq.Context()
         self.server.broadcaster = context.socket(zmq.PUB)
         self.server.broadcaster.bind(LEDHttpServer.zmqPort)
-        self.server.state = {"state": "embers", "color": "#FFFFFF"}
+        self.server.state = {"source": "embers", "color": "#FFFFFF"}
         
         try:
             while True:

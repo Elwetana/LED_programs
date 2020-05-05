@@ -3,3 +3,4 @@ __pycache__/
 *.pyc
 led_output.csv
 *.log
+*.svg
