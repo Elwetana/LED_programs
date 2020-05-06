@@ -25,7 +25,7 @@ class App:
     LED_INVERT = False    # True to invert the signal (when using NPN transistor level shift)
     LED_CHANNEL = 0       # set to '1' for GPIOs 13, 19, 41, 45 or 53
 
-    FRAME_TIME = 40       # desired time per frame in ms, fps = 1000/FRAME_TIME
+    FRAME_TIME = 100       # desired time per frame in ms, fps = 1000/FRAME_TIME
     FPS_SAMPLES = 50      # over how many samples calculate FPS
 
     def __init__(self, source: BasicSource, output: str):
@@ -85,7 +85,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--clear', action='store_true', help='clear the display on exit')
     parser.add_argument('-m', '--mode', choices=['EMBERS','PERLIN','COLOR'],
-                        default="EMBERS", help='output mode, can be either PERLIN or EMBERS')
+                        default="COLOR", help='output mode, can be either PERLIN or EMBERS')
     parser.add_argument('-o', '--output', choices=['STRIP', 'LED', 'PLOT', 'DUMMY'], default='LED',
                         help='Output device, on Windows, only LED and PLOT are valid')
     parser.add_argument('-t', '--timespeed', default=1, type=int,

@@ -4,3 +4,4 @@ __pycache__/
 led_output.csv
 *.log
 *.svg
+*.docx
