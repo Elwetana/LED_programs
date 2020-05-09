@@ -92,7 +92,9 @@
         }
 
         function textMessage(event) {
-            let txt = document.getElementById("msg").value
+            let txt = event.target.value
+            if(event.target.id == "morsetext")
+                txt = document.getElementById("msg").value
             let url = "msg/" + event.target.id.toUpperCase() + "?" + txt
             fetch(url, {method: 'GET'})
             .then(response => response.json())
@@ -147,7 +149,10 @@
     <div>
         <input type="text" id="msg" value="TOTO JE POKUS">
         <button class="special" id="morsetext">Text</button>
-        <button class="special" id="morsemode">Mode</button>
+        <button class="special" id="morsemode" value="0">Morse scroll</button>
+        <button class="special" id="morsemode" value="1">Text scroll</button>
+        <button class="special" id="morsemode" value="2">Morse blink</button>
+        <button class="special" id="morsemode" value="3">Cycle</button>
     </div>
     <div id="systeminfo">
         {{systeminfo}}
