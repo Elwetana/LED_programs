@@ -39,7 +39,13 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
             self.server.state["source"] = l[0].lower()
             if len(l) > 1:
                 self.server.state["color"] = "#" + l[1]
-
+            return
+        if self.path[0:4] == "/msg":
+            payload = self.path[len("/msg/"):]
+            msg = "LED MSG %s" % payload
+            self.server.broadcaster.send_string(msg)
+            logger.info("ZMQ message sent: %s" % msg)
+            self.wfile.write('{"result":"ok"}'.encode())
             return
         fname = "http%s" % self.path
         if os.path.exists(fname):
