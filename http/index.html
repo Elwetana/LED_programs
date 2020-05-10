@@ -32,6 +32,7 @@
             }
             document.getElementById(state.source).className = "source selected"
             document.getElementById("hsl_color").value = state.color
+            document.getElementById("msg").value = messages[message_index]
         }
 
         function initColorPicker() {
@@ -91,10 +92,21 @@
             });
         }
 
+        let message_index = 0
+        let messages = [
+            "AHOJ URSULO",
+            "HLEDEJ U HEDVIKY",
+            "TAK MOZNA V KOUPELNE",
+            "U KLAVIRU VLASTNE"
+        ]
+
         function textMessage(event) {
             let txt = event.target.value
-            if(event.target.id == "morsetext")
+            if(event.target.id == "morsetext") {
                 txt = document.getElementById("msg").value
+                message_index = (message_index + 1) % messages.length
+                updateState()
+            }
             let url = "msg/" + event.target.id.toUpperCase() + "?" + txt
             fetch(url, {method: 'GET'})
             .then(response => response.json())
