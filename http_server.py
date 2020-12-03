@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
+import argparse
 import logging
 import json
 import sys
@@ -46,6 +47,8 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
             self.server.broadcaster.send_string(msg)
             logger.info("ZMQ message sent: %s" % msg)
             self.wfile.write('{"result":"ok"}'.encode())
+            if payload[0:5] == "mode?":
+                self.server.state["mode"] = payload[5:]
             return
         fname = "http%s" % self.path
         if os.path.exists(fname):
@@ -76,7 +79,9 @@ class LEDHttpServer():
     timeout = 0.1
     zmqPort = "tcp://*:5556"
 
-    def __init__(self):
+    def __init__(self,args):
+        if(args.ip != "default"):
+            LEDHttpServer.serverIP = args.ip
         self.server = HTTPServer((LEDHttpServer.serverIP, LEDHttpServer.serverPort), LEDHttpHandler)
         self.server.timeout = LEDHttpServer.timeout
         logger.warning("HTTP server running")
@@ -85,7 +90,7 @@ class LEDHttpServer():
         context = zmq.Context()
         self.server.broadcaster = context.socket(zmq.PUB)
         self.server.broadcaster.bind(LEDHttpServer.zmqPort)
-        self.server.state = {"source": "embers", "color": "#FFFFFF"}
+        self.server.state = {"source": "embers", "color": "#FFFFFF", "mode": ""}
         
         try:
             while True:
@@ -99,7 +104,10 @@ if __name__ == "__main__":
     print("HTTP server class")
     logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s: %(message)s',
                         filename='server.log', level=logging.INFO)
-    server = LEDHttpServer()
+    parser = argparse.ArgumentParser(description='HTTP server for controlling LEDs')
+    parser.add_argument("-i", "--ip", help='IP address', default="default", type=str)
+    args = parser.parse_args()
+    server = LEDHttpServer(args)
     server.start()
     while True:
         pass
