@@ -4,6 +4,7 @@ from basic_source import BasicSource
 from perlin_source import PerlinSource
 from fire_source import FireSource
 from color_source import ColorSource
+from morse_source import MorseSource
 import time
 import argparse
 import sys
@@ -25,7 +26,7 @@ class App:
     LED_INVERT = False    # True to invert the signal (when using NPN transistor level shift)
     LED_CHANNEL = 0       # set to '1' for GPIOs 13, 19, 41, 45 or 53
 
-    FRAME_TIME = 40       # desired time per frame in ms, fps = 1000/FRAME_TIME
+    FRAME_TIME = 100       # desired time per frame in ms, fps = 1000/FRAME_TIME
     FPS_SAMPLES = 50      # over how many samples calculate FPS
 
     def __init__(self, source: BasicSource, output: str):
@@ -84,8 +85,8 @@ if __name__ == '__main__':
     # Process arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--clear', action='store_true', help='clear the display on exit')
-    parser.add_argument('-m', '--mode', choices=['EMBERS','PERLIN','COLOR'],
-                        default="EMBERS", help='output mode, can be either PERLIN or EMBERS')
+    parser.add_argument('-m', '--mode', choices=['EMBERS','PERLIN','COLOR', 'CHASER', 'MORSE'],
+                        default="MORSE", help='output mode, can be either PERLIN or EMBERS')
     parser.add_argument('-o', '--output', choices=['STRIP', 'LED', 'PLOT', 'DUMMY'], default='LED',
                         help='Output device, on Windows, only LED and PLOT are valid')
     parser.add_argument('-t', '--timespeed', default=1, type=int,
@@ -107,6 +108,8 @@ if __name__ == '__main__':
         actual_source = FireSource(args.timespeed, output_type)
     elif args.mode == "COLOR":
         actual_source = ColorSource(args.timespeed, output_type, ["#FF0000", "#000000", "#000000"])
+    elif args.mode == "MORSE":
+        actual_source = MorseSource(args.timespeed, output_type)
     app = App(actual_source, actual_output)
     if actual_output == 'STRIP' or actual_output == 'DUMMY':
         try:

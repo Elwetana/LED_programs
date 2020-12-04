@@ -10,30 +10,176 @@
         document.addEventListener("DOMContentLoaded", function() {
             start()
 
-            let sources = document.getElementsByClassName("source")
-            for(let s of sources) {
+            /*for(let s of document.getElementsByClassName("source")) {
                 s.addEventListener("click", sourceMessage)
             }
+            for(let s of document.getElementsByClassName("special")) {
+                s.addEventListener("click", textMessage)
+            }
+            document.getElementById("test").addEventListener("click", test) */
         });
 
+        //{"source": "", "color": "#FFFFFF", mode: "..."}
         let state = {{state}}
 
+        let sources = [
+            { id: "embers", label: "Fire", modes: [] },
+            { id: "perlin", label: "Sky", modes: [] },
+            { id: "color",  label: "Colour", controls: "iro", modes: [] },
+            { id: "chaser", label: "Chaser", modes: [] },
+            { id: "morse",  label: "Morse", controls: "morse_controls", modes: [
+                {id: "scroll", label: "Morse scroll"},
+                {id: "text", label: "Text scroll"},
+                {id: "blink", label: "Morse blink"},
+                {id: "cycle", label: "Cycle"}
+            ] },
+            { id: "xmas",   label: "Christmas", modes: [
+                {id: "glitter", label: "Glitter"},
+                {id: "snowflakes", label: "Snowflakes"},
+                {id: "icicles", label: "Icicles"},
+                {id: "glitter2", label: "Ursula Glitter"},
+                {id: "debug", label: "DEBUG"}
+            ] },
+            { id: "disco", label: "Music", modes: [] },
+            { id: "off", label: "Off", modes: [] }
+        ]
+
         function start() {
+            buildButtons()
             initColorPicker()
             updateState()
         }
 
-        function updateState() {
-            let sources = document.getElementsByClassName("source")
-            for(let s of sources) {
-                s.className = "source unselected"
-            }
-            document.getElementById(state.source).className = "source selected"
-            document.getElementById("hsl_color").value = state.color
+        function makeButton(data, classnames, onclick) {
+            let button = document.createElement("button");
+            button.id = data.id
+            button.innerText = data.label
+            button.className = classnames
+            button.addEventListener("click", onclick)
+            return button
         }
 
+        function buildButtons() {
+            let ds = document.getElementById("sources");
+            for(let source of sources) {
+                let dm = document.createElement("div")
+                dm.className = "source_container"
+                dm.appendChild(makeButton(source, "source unselected", sourceMessage))
+                if(source.modes.length > 0) {
+                    for(let mode of source.modes) {
+                        dm.appendChild(makeButton(mode, "mode hidden", modeMessage))
+                    }
+                }
+                ds.appendChild(dm)
+            }
+        }
+
+        function updateModes(source) {
+            if(source.modes.length === 0)
+                return
+            let display = (state.source === source.id) ? "" : "none";
+            for(let mode of source.modes) {
+                document.getElementById(mode.id).style.display = display
+                document.getElementById(mode.id).className = "mode unselected"
+            }
+        }
+
+        function updateControls(source) {
+            if(!("controls" in source))
+                return;
+            let display = (state.source === source.id) ? "" : "none";
+            document.getElementById(source.controls).style.display = display
+        }
+
+        function updateState() {
+            for(let source of sources) {
+                document.getElementById(source.id).className = "source unselected"
+                document.getElementById(source.id).style.display = ""
+                updateModes(source)
+                updateControls(source);
+            }
+            let activeSource = sources.find((x) => x.id === state.source);
+            if(activeSource.modes.length > 0) {
+                document.getElementById(state.source).style.display = "none"
+                document.getElementById(state.mode).className = "mode selected"
+            }
+            else {
+                document.getElementById(state.source).className = "source selected"
+            }
+            document.getElementById("hsl_color").value = state.color
+            colorPicker.color.hexString = state.color
+        }
+
+        let messages = []
+        let message_lock = 0
+
+        function sendMessage(msg) {
+            fetch( msg.url, {
+                method: 'GET',                
+            })
+            .then(response => response.json())
+            .then(data => {
+                if(data.result != "ok") {
+                    alert("Error communicating with sever")
+                }
+                else {
+                    console.log("Message sent " + msg.url)
+                    msg.callback()
+                }
+            }).then(() => {
+                if(messages.length > 0) {
+                    message = messages.shift()
+                    sendMessage(message);
+                }
+                else {
+                    message_lock = 0;
+                }
+            }).catch((error) => {
+                alert('Error:' + error);
+            });
+        }
+
+        function queueMessage(url, callback) {
+            msg = {url: url, callback: callback}
+            if(message_lock === 0) {
+                message_lock = 1
+                sendMessage(msg)
+            }
+            else {
+                messages.push(msg)
+            }
+        }
+
+        function sourceMessage(event) {
+            let source = event.target.id
+            let s = sources.find((x) => x.id === source)
+            state.source = source
+            state.mode = (s.modes.length > 0) ? s.modes[0].id : ""
+            queueMessage("source/" + source, updateState)
+            if(source === "color") {
+                sendColor(null)
+            }
+        }
+
+        function modeMessage(event) {
+            state.mode = event.target.id
+            queueMessage("msg/mode?" + state.mode, updateState)
+        }
+
+        function sendMorseText(event) {
+            let txt = document.getElementById("msg").value
+            queueMessage("msg/text?" + txt, () => {})
+        }
+
+        function sendColor(event) {
+            let color = document.getElementById("hsl_color").value
+            state.color = color
+            queueMessage("msg/color?" + color.substr(1), updateState)
+        }
+
+        let colorPicker = null;
         function initColorPicker() {
-            let colorPicker = new iro.ColorPicker('#picker', {
+            colorPicker = new iro.ColorPicker('#picker', {
                 width: 180,
                 layoutDirection: "horizontal",
                 layout: [
@@ -47,7 +193,6 @@
                         component: iro.ui.Box,
                         options: {}
                     }
-
                 ]
             });
             colorPicker.color.hexString = state.color;
@@ -59,34 +204,6 @@
             colorInput.addEventListener("change", function(event) {
                 colorPicker.color.hexString = colorInput.value
             })
-
-        }
-
-        function sourceMessage(event) {
-            let source = event.target.id
-            let url = "source/" + source
-            state.source = source
-            if(source === "color") {
-                let color = document.getElementById("hsl_color").value
-                url += "?" + color.substr(1)
-                state.color = color
-            }
-            fetch( url, {
-                method: 'GET',                
-            })
-            .then(response => response.json())
-            .then(data => {
-                if(data.result != "ok") {
-                    alert("Error communicating with sever")
-                }
-                else {
-                    console.log("Message sent")
-                    updateState()
-                }
-            })
-            .catch((error) => {
-                alert('Error:' + error);
-            });
         }
     </script>
     <style type="text/css">
@@ -100,13 +217,26 @@
             max-width: 100%;
             flex-wrap: wrap;
         }
-        button.source {
+
+        div.source_container {
             min-width: 180px;
             min-height: 100px;
             width: 20vw;
             height: 15vh;
             margin: 1vw;
+            display: flex;
+            flex-wrap: wrap;
+        }
+
+        button.source {
             font-size: 150%;
+            width: 100%;
+            height: 100%;
+        }
+
+        button.mode {
+            font-size: 125%;
+            width: 50%;
         }
 
         button.unselected {
@@ -117,19 +247,24 @@
             background-color: lightgray;
         }
 
+        .hidden {
+            display: none;
+        }
+
     </style>
 </head>
 <body>
 <div>
     <div id="sources">
-        <button class="source unselected" id="embers">Fire</button>
-        <button class="source unselected" id="perlin">Sky</button>
-        <button class="source unselected" id="color">Colour</button>
-        <button class="source unselected" id="off">Off</button>
     </div>
     <div id="iro">
         <div id="picker"></div>
         <input type="text" id="hsl_color" value="#ffffff">
+        <button id="setcolor", onclick="sendColor()">Set color</button>
+    </div>
+    <div id="morse_controls">
+        <input type="text" id="msg" value="Vložte text">
+        <button id="morsetext" onclick="sendMorseText()">Text</button>
     </div>
     <div id="systeminfo">
         {{systeminfo}}

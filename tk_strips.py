@@ -23,21 +23,22 @@ class DummyStrip:
 
 class TkStrip:
     LED_WIDTH = 6
-    LED_HEIGHT = 16
-    LED_SPACE = 2
+    LED_HEIGHT = 6
+    LED_SPACE_H = 2
+    LED_SPACE_V = 32
     LED_PER_ROW = 150
 
     def __init__(self, nLed, app):
         self.app = app
         self.root = Tk()
         self.leds = []
-        max_w = (TkStrip.LED_WIDTH + TkStrip.LED_SPACE) * TkStrip.LED_PER_ROW
-        max_h = (TkStrip.LED_HEIGHT + TkStrip.LED_SPACE) * ceil(nLed / TkStrip.LED_PER_ROW)
+        max_w = (TkStrip.LED_WIDTH + TkStrip.LED_SPACE_H) * TkStrip.LED_PER_ROW
+        max_h = (TkStrip.LED_HEIGHT + TkStrip.LED_SPACE_V) * ceil(nLed / TkStrip.LED_PER_ROW)
         self.w = Canvas(self.root, width=max_w, height=max_h)
         self.w.pack()
         for i in range(nLed):
-            x = (i % TkStrip.LED_PER_ROW) * (TkStrip.LED_WIDTH + TkStrip.LED_SPACE) + TkStrip.LED_SPACE // 2
-            y = (i // TkStrip.LED_PER_ROW) * (TkStrip.LED_HEIGHT + TkStrip.LED_SPACE) + TkStrip.LED_SPACE // 2
+            x = (i % TkStrip.LED_PER_ROW) * (TkStrip.LED_WIDTH + TkStrip.LED_SPACE_H) + TkStrip.LED_SPACE_H // 2
+            y = (i // TkStrip.LED_PER_ROW) * (TkStrip.LED_HEIGHT + TkStrip.LED_SPACE_V) + TkStrip.LED_SPACE_V // 2
             self.leds.append(self.w.create_rectangle(x, y, x + TkStrip.LED_WIDTH, y + TkStrip.LED_HEIGHT,
                                                      fill="white", width=0))
 
