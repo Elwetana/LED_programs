@@ -107,6 +107,7 @@
                 document.getElementById(state.source).className = "source selected"
             }
             document.getElementById("hsl_color").value = state.color
+            colorPicker.color.hexString = state.color
         }
 
         let messages = []
@@ -176,8 +177,9 @@
             queueMessage("msg/color?" + color.substr(1), updateState)
         }
 
+        let colorPicker = null;
         function initColorPicker() {
-            let colorPicker = new iro.ColorPicker('#picker', {
+            colorPicker = new iro.ColorPicker('#picker', {
                 width: 180,
                 layoutDirection: "horizontal",
                 layout: [
@@ -202,10 +204,7 @@
             colorInput.addEventListener("change", function(event) {
                 colorPicker.color.hexString = colorInput.value
             })
-
         }
-
-
     </script>
     <style type="text/css">
         div#iro {
