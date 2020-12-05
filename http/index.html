@@ -33,7 +33,7 @@
                 {id: "blink", label: "Morse blink"},
                 {id: "cycle", label: "Cycle"}
             ] },
-            { id: "xmas",   label: "Christmas", modes: [
+            { id: "xmas",   label: "Christmas", controls: "debug_controls", modes: [
                 {id: "glitter", label: "Glitter"},
                 {id: "snowflakes", label: "Snowflakes"},
                 {id: "icicles", label: "Icicles"},
@@ -177,6 +177,14 @@
             queueMessage("msg/color?" + color.substr(1), updateState)
         }
 
+        function sendDebugNumber(event) {
+            let dn = document.getElementById("debug_number")
+            let n = dn.value
+            queueMessage("msg/debug?"+n, () => {
+                dn.value = 1 * n + 1
+            })
+        }
+
         let colorPicker = null;
         function initColorPicker() {
             colorPicker = new iro.ColorPicker('#picker', {
@@ -265,6 +273,10 @@
     <div id="morse_controls">
         <input type="text" id="msg" value="Vložte text">
         <button id="morsetext" onclick="sendMorseText()">Text</button>
+    </div>
+    <div id="debug_controls">
+        <input type="number" id="debug_number" value="0">
+        <button id="debug_button" onclick="sendDebugNumber()">Set number</button>
     </div>
     <div id="systeminfo">
         {{systeminfo}}
