@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>XMAS 2020</title>
+    <style type="text/css">
+        body {
+            width: 100%;
+            height: 100%;
+            background-color: black;
+        }
+        div.led {
+            width: 100px;
+            height: 100px;
+            outline: solid red 1px;
+            margin: 100px;
+        }
+        div#g {
+            width: 800px;
+            height: 100px;
+        }
+        canvas#gc {
+            display: block;
+        }
+    </style>
+    <script type="application/javascript">
+      document.addEventListener("DOMContentLoaded", function() {
+        start();
+      });
+
+      let d = null;
+      let canvas = null;
+      let ctx = null;
+      let imageData = null;
+
+      let periodAvg = 2000; //in ms
+      let hue = 210;
+      let sat = 0.8;
+      let lgt = 0.5;
+      let spec = 20;
+      let k_diff = (1 - lgt)/2;
+      let k_spec = (1 - lgt)/1.5;
+      let spec_phase = 1.1;
+
+      let period_diff = null;
+      let period_spec = null;
+
+      function MakePeriodObject(basePeriod, periodRange) {
+        let period = {
+          nextChange: 0,
+          prevChange: 0,
+        };
+        period.getPeriod = function (t) {
+          if(t > period.nextChange) {
+            period.lastChange = period.nextChange;
+            period.nextChange = t + basePeriod + (Math.random() - 0.5) * periodRange;
+            console.log("Next period interval: " + (period.nextChange - period.lastChange) )
+          }
+          return (t - period.lastChange)/(period.nextChange - period.lastChange);
+        };
+        return period;
+      }
+
+
+      function update (timestamp) {
+        //console.log(timestamp);
+
+        let alpha_diff = 2 * Math.PI * period_diff.getPeriod(timestamp);
+        let alpha_spec = 2 * Math.PI * period_spec.getPeriod(timestamp);
+        let h = hue;
+        let s = sat;
+        let l = lgt + k_diff * Math.abs(Math.cos(alpha_diff)) + k_spec * (Math.abs(Math.cos(alpha_spec + spec_phase))**spec);
+        plot(timestamp/100, 100 - 100 * l);
+        if(l > 1) l = 1;
+
+        let dd = document.getElementsByClassName("led");
+        dd[0].style.backgroundColor = "hsl(" + h + "," + Math.round(50 * s) + "%, " + Math.round(50 * l**2) + "%)";
+        dd[1].style.backgroundColor = "hsl(" + h + "," + Math.round(100 * s) + "%, " + Math.round(100 * l) + "%)";
+        dd[2].style.backgroundColor = "hsl(" + h + "," + Math.round(50 * s) + "%, " + Math.round(50 * l**2) + "%)";
+        window.requestAnimationFrame(update);
+      }
+
+      function start () {
+        d = document.getElementById("x");
+        period_diff = MakePeriodObject(15000, 5000);
+        period_spec = MakePeriodObject(20000, 5000);
+
+
+        canvas = document.getElementById("gc");
+        ctx = canvas.getContext('2d');
+        ctx.fillStyle = "white";
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+        window.requestAnimationFrame(update);
+      }
+
+      function plot (x,y) {
+        ctx.fillStyle = "black";
+        ctx.fillRect(x,y,1,1);
+      }
+
+    </script>
+</head>
+<body>
+<div style="display: flex">
+    <div class="led"></div>
+    <div class="led" id="x"></div>
+    <div class="led"></div>
+</div>
+<div id="g">
+    <canvas id="gc" width="800" height="100"></canvas>
+</div>
+</body>
+</html>
