@@ -62,8 +62,8 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
                 d = self.save_config(self.path[8:])
                 s = json.dumps(d)
                 if "result" in d and d["result"] == "ok":
-                    self.server.broadcaster.send_string("RELOAD")
-                    logger.info("ZMQ message sent: RELOAD")
+                    self.server.broadcaster.send_string("LED RELOAD COLOR")
+                    logger.info("ZMQ message sent: LED RELOAD COLOR")
                 self.wfile.write(s.encode())
             return
         fname = "http%s" % self.path
