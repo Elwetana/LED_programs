@@ -6,6 +6,8 @@ import logging
 import json
 import sys
 import os
+import os.path
+import re
 import zmq
 
 
@@ -50,6 +52,20 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
             if payload[0:5] == "mode?":
                 self.server.state["mode"] = payload[5:]
             return
+        if self.path[0:7] == "/config":
+            if "?" not in self.path:
+                d = self.get_config()
+                d["result"] = "ok"
+                s = json.dumps(d)
+                self.wfile.write(s.encode())
+            else:
+                d = self.save_config(self.path[8:])
+                s = json.dumps(d)
+                if "result" in d and d["result"] == "ok":
+                    self.server.broadcaster.send_string("RELOAD")
+                    logger.info("ZMQ message sent: RELOAD")
+                self.wfile.write(s.encode())
+            return
         fname = "http%s" % self.path
         if os.path.exists(fname):
             f = open(fname, 'r')
@@ -68,6 +84,114 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
         temp_info = "<tr><td colspan=4>CPU temperature: %s°C</td></tr>\n" % (int(ftemp.readline()) / 1000)
         return "<table>\n" + proc_info + temp_info + "</table>\n"
 
+    def get_config(self):
+        if not os.path.exists(self.server.config_path):
+            return {"error": "config file not found"}
+        d = {}
+        with open(self.server.config_path, "r") as fc:
+            ll = fc.readlines()
+        i = 0
+        while ll[i][0] == ";" or ll[i][0] == "#":  # skip comments in beginning of file
+            i += 1
+        while i < len(ll):
+            name = ll[i][0:ll[i].index(" ")]
+            i += 1
+            if len(ll[i]) > 0 and ll[i][0] == "#":  # this is commented config line, we want to put it in dictionary
+                d[name] = {}
+                color_comments = ll[i][1:].strip().split('-')
+                for cc in color_comments:
+                    ii = cc.index(":")
+                    n = int(cc[0:ii])
+                    c = cc[cc.index(":") + 1:]
+                    d[name][n] = {"comment": c}
+                i += 1
+                colors = re.split(" +", ll[i].strip())
+                j = 0
+                n = 0
+                while True:
+                    if n not in d[name]:
+                        d[name][n] = {}
+                    d[name][n]["color"] = colors[j]
+                    if j == len(colors) - 1:
+                        break
+                    grad_len = int(colors[j + 1])
+                    if grad_len == 0:
+                        n += 1
+                    elif grad_len == 1:
+                        n += 1
+                    else:
+                        n += grad_len - 1
+                    j += 2
+            elif len(ll[i]) > 0 and ll[i][0] == ";":  # this is commented config line, we want to skip
+                i += 1
+            i += 1
+        return d
+
+    def save_config(self, s):
+        if not os.path.exists(self.server.config_path):
+            return {"error": "config file not found"}
+        aa = s[0:-1].split("&")
+        d = {}
+        for a in aa:
+            name_n, col = a.split("=")
+            name, n = name_n.split("__")
+            if name not in d:
+                d[name] = {}
+            d[name][int(n)] = col
+
+        # print(d)
+        out_lines = []
+        with open(self.server.config_path, "r") as fc:
+            ll = fc.readlines()
+        i = 0
+        while ll[i][0] == ";" or ll[i][0] == "#":  # skip comments in beginning of file
+            out_lines.append(ll[i])
+            i += 1
+        while i < len(ll):
+            name = ll[i][0:ll[i].index(" ")]
+            out_lines.append(ll[i])
+            i += 1
+            if len(ll[i]) > 0 and ll[i][0] == "#":  # we will update the next line
+                if name not in d:
+                    return {"error": "name %s not found in config" % name}
+                out_lines.append(ll[i])
+                i += 1
+
+                # this is the line we shall update
+                colors = re.split(" +", ll[i].strip())
+                j = 0
+                n = 0
+                line = ""
+                while True:
+                    if n not in d[name]:
+                        return {"error": "value for color %s not received in source %s" % (n, name)}
+                    line += "0x" + d[name][n]
+                    if j == len(colors) - 1:
+                        break
+                    grad_len = int(colors[j + 1])
+                    line += " %s " % grad_len
+                    if grad_len == 0:
+                        n += 1
+                    elif grad_len == 1:
+                        n += 1
+                    else:
+                        n += grad_len - 1
+                    j += 2
+                # print(line)
+                out_lines.append(line + "\n")
+                i += 1
+            elif len(ll[i]) > 0 and ll[i][0] == ";":  # this is commented config line, we want to skip
+                out_lines.append(ll[i])
+                i += 1
+                out_lines.append(ll[i])
+                i += 1
+            else:
+                out_lines.append(ll[i])
+                i += 1
+        with open(self.server.config_path, "w") as fc2:
+            fc2.writelines(out_lines)
+        return {"result": "ok"}
+
 
 class LEDHttpServer():
 
@@ -84,6 +208,7 @@ class LEDHttpServer():
             LEDHttpServer.serverIP = args.ip
         self.server = HTTPServer((LEDHttpServer.serverIP, LEDHttpServer.serverPort), LEDHttpHandler)
         self.server.timeout = LEDHttpServer.timeout
+        self.server.config_path = args.config_path
         logger.warning("HTTP server running")
 
     def start(self):
@@ -106,6 +231,7 @@ if __name__ == "__main__":
                         filename='server.log', level=logging.INFO)
     parser = argparse.ArgumentParser(description='HTTP server for controlling LEDs')
     parser.add_argument("-i", "--ip", help='IP address', default="default", type=str)
+    parser.add_argument("-c", "--config_path", help="Controller config path", default="d:\\code\\C++\\filter_test\\LED_controller\\config", type=str)
     args = parser.parse_args()
     server = LEDHttpServer(args)
     server.start()

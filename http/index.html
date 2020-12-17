@@ -124,7 +124,8 @@
                 }
                 else {
                     console.log("Message sent " + msg.url)
-                    msg.callback()
+                    delete data.result
+                    msg.callback(data)
                 }
             }).then(() => {
                 if(messages.length > 0) {
@@ -183,6 +184,71 @@
             queueMessage("msg/debug?"+n, () => {
                 dn.value = 1 * n + 1
             })
+        }
+
+        function LoadConfig() {
+            queueMessage("config", DisplayConfig)
+        }
+
+        function DisplayConfig(data) {
+            //console.log(data);
+            let d = document.getElementById("swatches")
+            let old_ws = d.getElementsByClassName("swatch_src")
+            while(old_ws.length > 0) {
+                d.removeChild(old_ws[0])
+                old_ws = d.getElementsByClassName("swatch_src")
+            }
+            for(let src in data) {
+                let src_div = document.createElement("div")
+                src_div.className = "swatch_src"
+                src_div.setAttribute("data-src", src)
+                let src_head = document.createElement("p")
+                src_head.innerText = src
+                src_div.appendChild(src_head)
+                for(let col_index in data[src]) {
+                    let sw_container = document.createElement("div")
+                    sw_container.className = "swatch_container"
+                    sw_container.id = "swc__" + src + "__" + col_index
+                    let sw_name = document.createElement("p")
+                    sw_name.innerText = data[src][col_index]["comment"]
+                    sw_container.appendChild(sw_name)
+                    let swatch = document.createElement("div")
+                    swatch.className = "swatch_show"
+                    swatch.id = "swatch__" + src + "__" + col_index
+                    let color = data[src][col_index]["color"]
+                    color = color.substring(2)
+                    swatch.style.backgroundColor = "#" + color
+                    sw_container.appendChild(swatch)
+                    let sw_edit = document.createElement("input")
+                    sw_edit.id = "swe__" + src + "__" + col_index
+                    sw_edit.className = "swatch_edit"
+                    sw_edit.value = color
+                    sw_edit.text = color
+                    sw_edit.addEventListener("change", UpdateSwatch)
+                    sw_container.appendChild(sw_edit)
+                    src_div.appendChild(sw_container)
+                }
+                d.appendChild(src_div)
+            }
+        }
+
+        function UpdateSwatch(event) {
+            //console.log(event)
+            let ids = event.target.id.split("__")
+            let swatch_id = "swatch__" + ids[1] + "__" + ids[2]
+            let swatch = document.getElementById(swatch_id)
+            swatch.style.backgroundColor = "#" + event.target.value;
+        }
+
+        function SaveConfig() {
+            let inputs = document.getElementsByClassName("swatch_edit")
+            let s = "?"
+            for(let inp of inputs) {
+                let ids = inp.id.split("__")
+                s += ids[1] + "__" + ids[2] + "=" + inp.value + "&"
+            }
+            //console.log(s)
+            queueMessage("config" + s, () => {})
         }
 
         let colorPicker = null;
@@ -259,6 +325,40 @@
             display: none;
         }
 
+        div.swatch_src {
+            display: flex;
+            flex-wrap: wrap;
+        }
+
+        div.swatch_src p {
+            width: 100%;
+            text-align: left;
+            margin-bottom: 0;
+            margin-left: 10px;
+        }
+
+        div.swatch_container {
+            display: flex;
+            flex-direction: column;
+            margin: 0 10px;
+        }
+
+        div.swatch_container p {
+            margin: 0;
+        }
+
+        div.swatch_show {
+            width: 100px;
+            height: 75px;
+        }
+
+        input.swatch_edit {
+            width: 90px;
+            margin: 0;
+        }
+
+
+
     </style>
 </head>
 <body>
@@ -280,6 +380,10 @@
     </div>
     <div id="systeminfo">
         {{systeminfo}}
+    </div>
+    <div id="swatches">
+        <button id="load_config" onclick="LoadConfig()">Load Config</button>
+        <button id="save_config" onclick="SaveConfig()">Save Config</button>
     </div>
 </div>
 
