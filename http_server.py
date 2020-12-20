@@ -100,6 +100,9 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
                 d[name] = {}
                 color_comments = ll[i][1:].strip().split('-')
                 for cc in color_comments:
+                    if ':' not in cc:
+                        print("ERROR in comment %s." % cc)
+                        continue
                     ii = cc.index(":")
                     n = int(cc[0:ii])
                     c = cc[cc.index(":") + 1:]

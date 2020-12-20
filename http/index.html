@@ -41,6 +41,7 @@
                 {id: "debug", label: "DEBUG"}
             ] },
             { id: "disco", label: "Music", modes: [] },
+            { id: "game", label: "Game", modes: [], controls: "game_controls" },
             { id: "off", label: "Off", modes: [] }
         ]
 
@@ -251,6 +252,11 @@
             queueMessage("config" + s, () => {})
         }
 
+        function SetGameMode() {
+            let input = document.getElementById("game_mode_input")
+            queueMessage("msg/mode?" + input.value, () => {})
+        }
+
         let colorPicker = null;
         function initColorPicker() {
             colorPicker = new iro.ColorPicker('#picker', {
@@ -328,6 +334,8 @@
         div.swatch_src {
             display: flex;
             flex-wrap: wrap;
+            background-color: grey;
+            padding-bottom: 20px;
         }
 
         div.swatch_src p {
@@ -377,6 +385,10 @@
     <div id="debug_controls">
         <input type="number" id="debug_number" value="0">
         <button id="debug_button" onclick="sendDebugNumber()">Set number</button>
+    </div>
+    <div id="game_controls">
+        <input type="text" id="game_mode_input" value="">
+        <button id="game_button" onclick="SetGameMode()">Send code</button>
     </div>
     <div id="systeminfo">
         {{systeminfo}}
