@@ -40,8 +40,11 @@
                 {id: "glitter2", label: "Ursula Glitter"},
                 {id: "debug", label: "DEBUG"}
             ] },
+            { id: "xmas2",  send_name: "xmas", label: "Christmas", modes: [
+                {id: "gradient", label: "Gradient"}
+                ]},
             { id: "disco", label: "Music", modes: [] },
-            { id: "game", label: "Game", modes: [], controls: "game_controls" },
+            //{ id: "game", label: "Game", modes: [], controls: "game_controls" },
             { id: "off", label: "Off", modes: [] }
         ]
 
@@ -155,9 +158,13 @@
         function sourceMessage(event) {
             let source = event.target.id
             let s = sources.find((x) => x.id === source)
+            let msgName = source;
+            if(s.hasOwnProperty("send_name")) {
+                msgName = s.send_name;
+            }
             state.source = source
             state.mode = (s.modes.length > 0) ? s.modes[0].id : ""
-            queueMessage("source/" + source, updateState)
+            queueMessage("source/" + msgName, updateState)
             if(source === "color") {
                 sendColor(null)
             }

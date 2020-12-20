@@ -122,8 +122,12 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
                         n += 1
                     elif grad_len == 1:
                         n += 1
-                    else:
+                    elif j + 3 == len(colors):
                         n += grad_len - 1
+                    elif int(colors[j + 3]) == 0:
+                        n += grad_len - 1
+                    else:
+                        n += grad_len
                     j += 2
             elif len(ll[i]) > 0 and ll[i][0] == ";":  # this is commented config line, we want to skip
                 i += 1
@@ -177,8 +181,12 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
                         n += 1
                     elif grad_len == 1:
                         n += 1
-                    else:
+                    elif j + 3 == len(colors):
                         n += grad_len - 1
+                    elif int(colors[j + 3]) == 0:
+                        n += grad_len - 1
+                    else:
+                        n += grad_len
                     j += 2
                 # print(line)
                 out_lines.append(line + "\n")
