@@ -38,11 +38,12 @@
                 {id: "snowflakes", label: "Snowflakes"},
                 {id: "icicles", label: "Icicles"},
                 {id: "glitter2", label: "Ursula Glitter"},
-                {id: "debug", label: "DEBUG"}
             ] },
             { id: "xmas2",  send_name: "xmas", label: "Christmas", modes: [
                 {id: "gradient", label: "Gradient"},
-                {id: "joy_pattern", label: "Joy"}
+                {id: "joy_pattern", label: "Joy"},
+                {id: "fireworks", label: "Fireworks"},
+                {id: "debug", label: "DEBUG"}
                 ]},
             { id: "disco", label: "Music", modes: [] },
             //{ id: "game", label: "Game", modes: [], controls: "game_controls" },
@@ -60,6 +61,7 @@
             button.id = data.id
             button.innerText = data.label
             button.className = classnames
+            button.setAttribute("data-source", data.hasOwnProperty("send_name") ? data.send_name : data.id)
             button.addEventListener("click", onclick)
             return button
         }
@@ -82,7 +84,7 @@
         function updateModes(source) {
             if(source.modes.length === 0)
                 return
-            let display = (state.source === source.id) ? "" : "none";
+            let display = (state.source === source.id || (source.hasOwnProperty("send_name") && state.source == source.send_name)) ? "" : "none";
             for(let mode of source.modes) {
                 document.getElementById(mode.id).style.display = display
                 document.getElementById(mode.id).className = "mode unselected"
@@ -92,7 +94,7 @@
         function updateControls(source) {
             if(!("controls" in source))
                 return;
-            let display = (state.source === source.id) ? "" : "none";
+            let display = (state.source === source.id || (source.hasOwnProperty("send_name") && state.source == source.send_name)) ? "" : "none";
             document.getElementById(source.controls).style.display = display
         }
 
@@ -103,13 +105,16 @@
                 updateModes(source)
                 updateControls(source);
             }
-            let activeSource = sources.find((x) => x.id === state.source);
-            if(activeSource.modes.length > 0) {
-                document.getElementById(state.source).style.display = "none"
-                document.getElementById(state.mode).className = "mode selected"
-            }
-            else {
-                document.getElementById(state.source).className = "source selected"
+            let selectedSource = document.querySelectorAll('button[data-source="' + state.source + '"]')
+            for(let ss of selectedSource) {
+                let activeSource = sources.find((x) => x.id === ss.id);
+                if(activeSource.modes.length > 0) {
+                    document.getElementById(ss.id).style.display = "none"
+                    document.getElementById(state.mode).className = "mode selected"
+                }
+                else {
+                    document.getElementById(ss.id).className = "source selected"
+                }
             }
             document.getElementById("hsl_color").value = state.color
             colorPicker.color.hexString = state.color
@@ -163,7 +168,7 @@
             if(s.hasOwnProperty("send_name")) {
                 msgName = s.send_name;
             }
-            state.source = source
+            state.source = msgName
             state.mode = (s.modes.length > 0) ? s.modes[0].id : ""
             queueMessage("source/" + msgName, updateState)
             if(source === "color") {
