@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 class LEDHttpHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=UTF-8")
         self.end_headers()
         if self.path == "/favicon.ico":
             f = open("http/favicon.ico", 'rb')
@@ -68,7 +69,7 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
             return
         fname = "http%s" % self.path
         if os.path.exists(fname):
-            f = open(fname, 'r')
+            f = open(fname, 'r', encoding="utf-8")
             self.wfile.write(f.read().encode())
         else:
             self.wfile.write("FILE NOT FOUND".encode())
