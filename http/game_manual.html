@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Christmas game guide</title>
+</head>
+<body>
+    <div id="intro">
+        <p>
+            Welcome. This is a brief writeup on this year's Christmas game. TODO -- navigation
+        </p>
+    </div>
+    <div id="??">
+        <p>
+            <pre>
+int M = (streak / 4) + 1;
+int points_earned = 0;
+int bullet_value = (int[]){ 100, 1000, 10000, 100000 } [hit] ;
+switch (hit)
+{
+case DHI_MISS:
+    points_earned = -bullet_value / 10;
+    break;
+case DHI_GOOD:
+    points_earned = M * bullet_value;
+    break;
+case DHI_GREAT:
+    points_earned = M * M * bullet_value;
+    break;
+case DHI_PERFECT:
+    points_earned = M * M * 3 * bullet_value;
+    break;
+case DHI_N_COUNT:
+    break;
+}
+            </pre>
+        </p>
+    </div>
+</body>
