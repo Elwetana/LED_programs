@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
+import socket
 import argparse
 import logging
 import json
@@ -207,17 +208,24 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
 
 class LEDHttpServer():
 
-    if sys.platform != 'linux':
-        serverIP = '192.168.88.21'
-    else:
-        serverIP = '192.168.88.78'
+    serverIP = ""
     serverPort = 80
     timeout = 0.1
     zmqPort = "tcp://*:5556"
+    
+    def get_IP_address(self):
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        s.connect(('<broadcast>', 0))
+        return s.getsockname()[0]
+
 
     def __init__(self,args):
         if(args.ip != "default"):
             LEDHttpServer.serverIP = args.ip
+        else:
+            LEDHttpServer.serverIP = self.get_IP_address()
+        logger.info("Server address: %s" % LEDHttpServer.serverIP)
         self.server = HTTPServer((LEDHttpServer.serverIP, LEDHttpServer.serverPort), LEDHttpHandler)
         self.server.timeout = LEDHttpServer.timeout
         self.server.config_path = args.config_path
