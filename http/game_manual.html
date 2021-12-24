@@ -3,19 +3,80 @@
 <head>
     <meta charset="UTF-8">
     <title>Christmas game guide</title>
+    <style>
+        p.h {
+            font-weight: bold;
+            font-size: 125%;
+        }
+    </style>
 </head>
 <body>
     <div id="intro">
+        <p class="h">
+            Welcome. This is a brief writeup on this year's Christmas game.
+        </p>
         <p>
-            Welcome. This is a brief writeup on this year's Christmas game. TODO -- navigation
+            This year's game is based on everyone's favourite game, <em>Dance Dance Revolution</em> and 
+            this family of Rhythm & Dance games. So how do you play?
+        </p>
+        <p>
+            The game has certain number of <em>levels</em> that you have to clear to get the secret 
+            message at the end that will help you locate the location where the forgotful Ježíšek misplaced
+            your presents this year.
+        </p>
+        <p>
+            Every level has one of the <em>modes</em>: <b>Whack-a-beat</b> or <b>Fiat lux</b>. All levels
+            are cooperative, i.e. you don't compete with other players, but you work together to get the
+            highest score and beat the level target.
+        </p>
+        <p>
+            Every level has three phases:
+            <ol>
+                <li><em>Get ready</em> all players have to press Ready buttons on their controllers.
+                When you do, watch the tree! It will highlight your position. You can press Start button 
+                repeatedly</li>
+                <li><em>Play</em> you play the level, depending on the mode -- see below.</li>
+                <li><em>Score</em> your total score will be displayed with following simple rules:
+                    <ul>
+                        <li>Red: 100s</li>
+                        <li>Green: 1'000s</li>
+                        <li>Blue: 10'000s</li>
+                        <li>Yellow: 100'000s</li>
+                        <li>White: 1'000'000s</li>
+                    </ul>
+                    when all players press Start on their controllers, the score will be dismissed and next
+                    level will start.
+                </li>
+            </ol>
         </p>
     </div>
-    <div id="??">
+    <div id="DDR">
+        <p class="h">Whack-a-beat mode</p>
         <p>
+            This mode is most similair to well known games like DDR or Guitar Hero: balls of colour race along
+            the tree and you have to hit it when it reaches your position.
+        </p>
+        <p>
+            Every player has his or her own part of the chain, but all players get the same balls at the 
+            same time, so you can advise each other. You cannot move, obviously, and it is important to
+            pay attention while pressing the Start to begin the level to understand your position.
+        </p>
+        <p>
+            You should hit a button just when the ball is passing through your position. Depending on how
+            well you do that, the leds just behind your position will blink. These leds also show your streak
+            if you have any -- you build streak by succesfully hitting the ball.
+        </p>
+        <p>
+            The leds on the left (ball always travel from left to right, from the beginning of the chain 
+            to the end, i.e. from the floor up) of your playing field show your score, but it will be probably
+            difficult for you to watch it during play. Don't mind it and focus on whacking the beats!
+        </p>
+        <p>
+            Important part of this game mode is scoring, what follows is verbatim copy of the code:
             <pre>
 int M = (streak / 4) + 1;
 int points_earned = 0;
-int bullet_value = (int[]){ 100, 1000, 10000, 100000 } [hit] ;
+int bullet_value = (int[]){ 100, 1000, 10000, 100000 } [hit_colour] ;
 switch (hit)
 {
 case DHI_MISS:
@@ -34,6 +95,31 @@ case DHI_N_COUNT:
     break;
 }
             </pre>
+            You cannot be more explicit that that.
         </p>
+    </div>
+    <div id="OSC">
+        <p class="h">Fiat lux</p>
+        <p>
+            In this mode you try to light up the whole chain by hitting buttons to the beat. When you do, you 
+            will highlight the leds immediately to the left and right of your position (and on your position 
+            too), but when several players hit button simultaneously close to each other, more leds will
+            be highlighted and they will even get more energy, so they won't fade out so soon.
+        </p>
+        <p>
+            In this mode you can move and you can tell which position is you in two ways:
+            <ul>
+                <li>Watch the tree when pressing the Start button before the game begins</li>
+                <li>Every position blinks briefly every three seconds, the number of blinks corresponds
+                    to your player number</li>
+            </ul>
+        </p>
+        <p>
+            The chain is evaluated every beat and we measure how many leds are in sync with the song, and in 
+            the end we calculate your effectiveness and thence your score
+        </p>
+    </div>
+    <div>
+        <p class="h">Good luck!</p>
     </div>
 </body>
