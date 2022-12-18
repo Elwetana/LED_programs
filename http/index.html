@@ -281,6 +281,11 @@
             queueMessage("msg/mode?" + input.value, () => {})
         }
 
+        function SendMessage() {
+            let input = document.getElementById("game_mode_input")
+            queueMessage("msg/" + input.value, () => {})
+        }
+
         let colorPicker = null;
         function initColorPicker() {
             colorPicker = new iro.ColorPicker('#picker', {
@@ -412,8 +417,8 @@
     </div>
     <div id="game_controls">
         <input type="text" id="game_mode_input" value="">
-        <button id="game_button" onclick="SetGameMode()">Send code</button>
-        <p><a href="game_manual.html" target="_blank">Please read this</a></p>
+        <button id="game_button" onclick="SendMessage()">Send message</button>
+        <p><a href="game2022.html" target="_blank">Please read this</a></p>
     </div>
     <div id="systeminfo">
         {{systeminfo}}
