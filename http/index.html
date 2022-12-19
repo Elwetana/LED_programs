@@ -43,9 +43,10 @@
                 {id: "gradient", label: "Gradient"},
                 {id: "joy_pattern", label: "Joy"},
                 {id: "fireworks", label: "Fireworks"},
-                {id: "sledges", label: "Sledges"}
+                {id: "gradient2", label: "Cool gradient"}
             ] },
             { id: "xmas3",  send_name: "xmas", label: "Christmas", modes: [
+                {id: "sledges", label: "Sledges"},
                 {id: "valeria", label: "Valerie"},
                 {id: "random", label: "Random"},
                 {id: "debug", label: "DEBUG"}
@@ -58,6 +59,7 @@
                 {id: "a duha roste", label: "Level 4"}
                 ], controls: "game_controls" },
             { id: "rad_game", label: "Rhythm & Dance", modes: [], controls: "game_controls" },
+            { id: "m3_game", label: "Bezumed", modes: [], controls: "game_controls" },
             { id: "off", label: "Off", modes: [] }
         ]
 
@@ -405,7 +407,7 @@
     <div id="iro">
         <div id="picker"></div>
         <input type="text" id="hsl_color" value="#ffffff">
-        <button id="setcolor", onclick="sendColor()">Set color</button>
+        <button id="setcolor" onclick="sendColor()">Set color</button>
     </div>
     <div id="morse_controls">
         <input type="text" id="msg" value="Vložte text">
