@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import socket
 import argparse
 import logging
@@ -226,10 +226,10 @@ class LEDHttpServer():
         else:
             LEDHttpServer.serverIP = self.get_IP_address()
         logger.info("Server address: %s" % LEDHttpServer.serverIP)
-        self.server = HTTPServer((LEDHttpServer.serverIP, LEDHttpServer.serverPort), LEDHttpHandler)
+        self.server = ThreadingHTTPServer((LEDHttpServer.serverIP, LEDHttpServer.serverPort), LEDHttpHandler)
         self.server.timeout = LEDHttpServer.timeout
         self.server.config_path = args.config_path
-        logger.warning("HTTP server running")
+        logger.warning("Threading HTTP server running")
 
     def start(self):
         context = zmq.Context()
@@ -243,7 +243,7 @@ class LEDHttpServer():
         except:
             print(sys.exc_info())
             logger.fatal(sys.exc_info())
-        logger.warning("HTTP server terminating")
+        logger.warning("Threading HTTP server terminating")
 
 if __name__ == "__main__":
     print("HTTP server class")
