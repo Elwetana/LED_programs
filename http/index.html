@@ -316,6 +316,21 @@
                 colorPicker.color.hexString = colorInput.value
             })
         }
+
+        /*       paint stuff          */
+
+        /**
+         * Encode the array of numbers to base64 encoding
+         * https://developer.mozilla.org/en-US/docs/Glossary/Base64
+         * @param {number[]} data array of numbers 0..255
+         * @return {string} base64 encoded string
+         */
+        function base64encode(data) {
+            const arr = new Uint8Array(data)
+            const binString = String.fromCodePoint(...arr);
+            return btoa(binString)
+        }
+
     </script>
     <style type="text/css">
         div#iro {
