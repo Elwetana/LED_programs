@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>XTree Painter</title>
+    <style>
+        div#tools {
+            display: flex;
+        }
+
+        div.tool_item {
+            width: 32px;
+            height: 32px;
+            background-color: white;
+            background-size: cover;
+            background-origin: content-box;
+            background-repeat: no-repeat;
+            padding: 4px;
+            /*background-image: url("include/paintbrush-2-line.svg");*/
+        }
+
+        div#picker {
+            position: absolute;
+            top: 32px;
+            left: 32px;
+        }
+    </style>
+    <!-- script src="include/iro.min.js"></script -->
+    <script type="module" src="include/tree_painter.js"></script>
+</head>
+<body style="background-color: blanchedalmond;">
+<div id="main">
+    <p>XTREE</p>
+    <div id="tools"></div>
+    <canvas id="treeCanvas" width="800" height="1200" style="touch-action: none;"></canvas>
+    <div id="picker" style="display: none;"></div>
+</div>
+</body>
+</html>
