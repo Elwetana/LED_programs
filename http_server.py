@@ -1,5 +1,5 @@
 #!/usr/bin/python
-
+import base64
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import socket
 import argparse
@@ -11,6 +11,8 @@ import os.path
 import re
 import zmq
 
+from PIL import Image as pillowImg
+from colorsys import hls_to_rgb
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +60,8 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
             self.wfile.write('{"result":"ok"}'.encode())
             if payload[0:5] == "mode?":
                 self.server.state["mode"] = payload[5:]
+            if payload[0:4] == "set?":
+                self.save_state_as_png(payload[4:])
             return
         if self.path[0:7] == "/config":
             if "?" not in self.path:
@@ -90,6 +94,23 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
         ftemp = open("/sys/class/thermal/thermal_zone0/temp")
         temp_info = "<tr><td colspan=4>CPU temperature: %s°C</td></tr>\n" % (int(ftemp.readline()) / 1000)
         return "<table>\n" + proc_info + temp_info + "</table>\n"
+
+    def save_state_as_png(self, base64_state):
+        png = pillowImg.new('RGB', (16, 16))
+        state = base64.b64decode(base64_state)
+        for p in range(len(state) // 3):
+            h = state[3*p+0]
+            s = state[3*p+1]
+            l = state[3*p+2]
+            if s > 128:
+                h |= 256
+                s &= 127
+            x = p % 16
+            y = p // 16
+            rgb = hls_to_rgb(h / 360, l / 100, s / 100)
+            png.putpixel((x, y), (int(rgb[0] * 255), int(rgb[1]*255), int(rgb[2]*255)))
+
+        png.save("http/image.png", "PNG")
 
     def get_config(self):
         if not os.path.exists(self.server.config_path):
@@ -249,6 +270,7 @@ class LEDHttpServer():
             print(sys.exc_info())
             logger.fatal(sys.exc_info())
         logger.warning("Threading HTTP server terminating")
+
 
 if __name__ == "__main__":
     print("HTTP server class")

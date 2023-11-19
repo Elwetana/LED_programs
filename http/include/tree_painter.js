@@ -10,15 +10,21 @@ TODO:
 [ ] Preview mode for global adjustment
 [ ] Other chain display configurations
 [ ] Timeline and Keyframes
-[.] Undo/Redo
-
+[x] Undo/Redo
+[.] Communication with server
+[ ] Allow disabling live server connection
+[ ] Split toolbox and toolbar
+[ ] Saving selections
+[ ] Save/load in general -- on server? Locally?
 */
+
 import './iro.min.js'
 document.addEventListener('DOMContentLoaded', start)
 
 /* Config */
 
 const LED_RADIUS = 16
+const LED_SELECT_WIDTH = 2
 const N_LEDS = 200
 
 
@@ -132,7 +138,14 @@ function makeLedManager() {
             sameColour: (c) => { return led._colour.equal(c) },
             distanceSquared: (pt) => { return led._canvasPosition.dsq(pt) },
             index: () => { return led._index },
+            selected: false,
             paint: (ctx) => {
+                if(led.selected) {
+                    ctx.fillStyle = led._colour.l > 50 ? "#777" : "#999"
+                    ctx.beginPath()
+                    ctx.arc(led._canvasPosition.x, led._canvasPosition.y, LED_RADIUS + LED_SELECT_WIDTH, 0, 2*Math.PI)
+                    ctx.fill()
+                }
                 ctx.fillStyle = led._colour.getString()
                 ctx.beginPath()
                 ctx.arc(led._canvasPosition.x, led._canvasPosition.y, LED_RADIUS, 0, 2*Math.PI)
@@ -208,9 +221,8 @@ function makeLedManager() {
      *  When there is no redo queue, we just save the current state
      */
     function saveUndoRedo() {
-        const curState = saveState()
         if(redoQueue.length > 0) {
-            undoQueue.push(curState)
+            undoQueue.push(currentState)
             for (let i = redoQueue.length - 1; i > 0; i--) {
                 undoQueue.push(redoQueue[i])
             }
@@ -218,7 +230,7 @@ function makeLedManager() {
                 undoQueue.push(redoQueue.shift())
             }
         }
-        undoQueue.push(curState)
+        undoQueue.push(currentState)
     }
 
     const leds = []
@@ -230,13 +242,18 @@ function makeLedManager() {
         for(let l = 0; l < N_LEDS; l++) {
             leds.push(makeLED(l))
         }
+        const state = comm.loadLocalState()
+        if(state) {
+            loadState(state)
+        }
     }
 
     manager.init()
+    let currentState = saveState()
 
     manager.positionLEDs = function(mode, width, height) {
-        const LED_X_SPACE = 30
-        const LED_Y_SPACE = 20
+        const LED_X_SPACE = 20
+        const LED_Y_SPACE = 30
         let calcPosition = (i) => { return [0, 0] }
         if(mode === "LINE_L2R") {
             /*  |  radius
@@ -271,6 +288,8 @@ function makeLedManager() {
         if(distance < (LED_RADIUS + pointWidth) * (LED_RADIUS + pointWidth) && !leds[index].sameColour(colour)) {
             saveUndoRedo()
             leds[index].setColour(colour)
+            currentState = saveState()
+            comm.transmitState(currentState)
         }
     }
 
@@ -282,20 +301,32 @@ function makeLedManager() {
         return null
     }
 
+    manager.selectLed = function (point, pointWidth) {
+        let [distance, index] = getClosestSquared(point)
+        if(distance < (LED_RADIUS + pointWidth) * (LED_RADIUS + pointWidth) ) {
+            leds[index].selected = true
+        }
+    }
+
     manager.undoStep = function() {
         if(undoQueue.length === 0)
             return
-        redoQueue.push(saveState())
-        const state = undoQueue.pop()
-        loadState(state)
+        redoQueue.push(currentState)
+        currentState = undoQueue.pop()
+        loadState(currentState)
     }
 
     manager.redoStep = function () {
         if(redoQueue.length === 0)
             return
-        undoQueue.push(saveState())
-        const state = redoQueue.pop()
-        loadState(state)
+        undoQueue.push(currentState)
+        currentState = redoQueue.pop()
+        loadState(currentState)
+    }
+
+    manager.getStateBase64 = () => {
+        const binString = String.fromCodePoint(...currentState);
+        return btoa(binString)
     }
 
     return manager
@@ -318,27 +349,36 @@ function paintCanvas() {
 function makeToolBox() {
     let _selectedColour = makeHSL(0, 100, 50)
     let _currentTool = 'brush'
-    const toolbox = {
-        brush: {
-            icon: "paintbrush-2",
+
+    function makeCanvasTool(icon, processPoint) {
+        const t = {
+            icon: icon,
             handler: (e) => {
-                if(e.buttons === 1){
-                    leds.setColour(makePoint(e.offsetX, e.offsetY), e.width / 2, toolbox.colour.getColour())
+                if(e.buttons === 1) {
+                    const point = makePoint(e.offsetX, e.offsetY)
+                    processPoint(point, e.width / 2)
                     requestAnimationFrame(paintCanvas)
                 }
             },
             startTool: () => {
-                document.getElementById("treeCanvas").addEventListener("pointermove", toolbox.brush.handler)
+                document.getElementById("treeCanvas").addEventListener("pointerdown", t.handler)
+                document.getElementById("treeCanvas").addEventListener("pointermove", t.handler)
             },
             endTool: () => {
-                document.getElementById("treeCanvas").removeEventListener("pointermove", toolbox.brush.handler)
+                document.getElementById("treeCanvas").removeEventListener("pointerdown", t.handler)
+                document.getElementById("treeCanvas").removeEventListener("pointermove", t.handler)
             }
-        },
-        select: {
-            icon: "arrow-cursor-1",
-            startTool: () => {},
-            endTool: () => {}
-        },
+        }
+        return t
+    }
+
+    const toolbox = {
+        brush: makeCanvasTool("paintbrush-2", (pt, w) => {
+            leds.setColour(pt, w, toolbox.colour.getColour())
+        }),
+        select: makeCanvasTool("arrow-cursor-1", (pt, w) => {
+            leds.selectLed(pt, w)
+        }),
         undo: {
             icon: "undo",
             startTool: () => {
@@ -362,7 +402,7 @@ function makeToolBox() {
             },
             startTool: () => {
                 const closePicker = (ev) => {
-                    console.log(ev.target)
+                    //console.log(ev.target)
                     if(ev.target instanceof HTMLElement) {
                         document.getElementById("picker").style.display = "none"
                         document.getElementById("main").removeEventListener("pointerdown", closePicker)
@@ -424,6 +464,77 @@ function makeToolBox() {
     return toolbox
 }
 
+function makeCommunicator() {
+    const UPDATE_INTERVAL = 250 //ms
+
+    function saveLocally() {
+        console.log("saving locally")
+        localStorage.setItem("state", String.fromCodePoint(...lastState))
+    }
+
+    function sendToServer() {
+        // /msg/set?<base64 encoded state>
+        const msg = "/msg/set?" + btoa(String.fromCodePoint(...lastState))
+        fetch( msg, {
+            method: 'GET',
+        })
+        .then(response => response.json())
+        .then(data => {
+            if(data.result !== "ok") {
+                alert("Error sending state to sever")
+            }
+            else {
+                console.log("State sent to server")
+            }
+        }).catch((error) => {
+            alert('Error:' + error);
+        });
+    }
+
+    function saveState() {
+        saveLocally()
+        sendToServer()
+        updateQueued = false
+        lastUpdate = Date.now()
+    }
+
+    function loadLocally() {
+        console.log("Attempting to read state from local storage")
+        const binString = localStorage.getItem("state")
+        if(binString) {
+            console.log("State found in local storage")
+            return Uint8Array.from(binString, (m) => m.codePointAt(0));
+        }
+        return null
+    }
+
+    let lastUpdate = 0
+    let lastState
+    let updateQueued = false
+
+    const comm = {
+        transmitState: (state) => {
+            const now = Date.now()
+            lastState = state
+            if(now - lastUpdate > UPDATE_INTERVAL && !updateQueued) { //we can save now
+                saveState()
+                console.log("Saved immediately")
+            }
+            else if(!updateQueued) {
+                updateQueued = true
+                setTimeout(saveState, UPDATE_INTERVAL - (now - lastUpdate))
+                console.log("queueing update")
+            }
+            else {
+                console.log("update already queued")
+            }
+        },
+        loadLocalState: () => { return loadLocally() }
+    }
+    return comm
+}
+
+const comm = makeCommunicator()
 const leds = makeLedManager()
 
 function start() {
