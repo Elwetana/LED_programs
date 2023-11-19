@@ -1,15 +1,16 @@
 /*
 TODO:
 
-[ ] Brush tool
+[.] Brush tool
 [ ] Pan/move tool -- move the whole pattern along the chain (or only just selection?)
 [ ] Select tool
 [ ] Eye dropper tool
+[ ] Gradient
 [ ] Globally adjust saturation, lightness
-[ ] Preview mode for global ajustment
+[ ] Preview mode for global adjustment
 [ ] Other chain display configurations
 [ ] Timeline and Keyframes
-[ ] Undo/Redo
+[.] Undo/Redo
 
 */
 import './iro.min.js'
@@ -23,33 +24,88 @@ const N_LEDS = 200
 
 /* Factories */
 
+/**
+ * @typedef {Object} Point
+ * @property {number} x
+ * @property {number} y
+ * @property {function(Point): number} dsq
+ */
+
+/**
+ * Create point
+ * @param x
+ * @param y
+ * @return {Point}
+ */
 function makePoint(x=0, y=0) {
     let point = {
         x: x,
         y: y,
-        distanceSquared: (other) => {
+        /**
+         * @param other {Point}
+         * @return {number} */
+        dsq: (other) => {
             return (other.x - point.x) * (other.x - point.x) + (other.y - point.y) * (other.y - point.y)
         }
     }
     return point
 }
 
+function foo() {
+    const p1 = makePoint(0,1)
+    const p2 = makePoint(1, 0)
+    const d = p1.dsq(p2)
+    console.log(d)
+}
+
+
+/**
+ * @typedef {Object} HSLColour
+ * @property {number} h
+ * @property {number} s
+ * @property {number} l
+ * @property {function(HSLColour):void} update
+ * @property {function():HSLColour} copy
+ * @property {function(HSLColour):boolean} equal
+ * @property {function():string} getString
+ */
+
+/**
+ *
+ * @param h {number}
+ * @param s {number}
+ * @param l {number}
+ * @return {HSLColour}
+ */
 function makeHSL(h, s, l) {
     let hsl = {
         h: h,
         s: s,
         l: l,
+        /**
+         * @param other {HSLColour}
+         */
         update: (other) => {
             hsl.h = other.h
             hsl.s = other.s
             hsl.l = other.l
         },
+        /**
+         * @return {HSLColour}
+         */
         copy: () => {
             return makeHSL(hsl.h, hsl.s, hsl.l)
         },
+        /**
+         * @param other {HSLColour}
+         * @return {boolean}
+         */
         equal: (other) => {
             return (hsl.h === other.h) && (hsl.s === other.s) && (hsl.l === other.l)
         },
+        /**
+         * @return {string}
+         */
         getString: () => {
             return "hsl(" + hsl.h + " " + hsl.s + "% " + hsl.l + "%)"
         }
@@ -74,7 +130,7 @@ function makeLedManager() {
             setColour: (c) => { led._colour.update(c) },
             getColour: () => { return led._colour.copy() },
             sameColour: (c) => { return led._colour.equal(c) },
-            distanceSquared: (pt) => { return led._canvasPosition.distanceSquared(pt) },
+            distanceSquared: (pt) => { return led._canvasPosition.dsq(pt) },
             index: () => { return led._index },
             paint: (ctx) => {
                 ctx.fillStyle = led._colour.getString()
@@ -117,9 +173,58 @@ function makeLedManager() {
         return state
     }
 
+    /**
+     * Restore state created by saveState
+     * @param state {Uint8Array}
+     */
+    function loadState(state) {
+        for(let p = 0; p < N_LEDS; p++) {
+            let h = state[3*p+0]
+            let s = state[3*p+1]
+            let l = state[3*p+2]
+            if(s > 128) {
+                h |= 256
+                s &= 127
+            }
+            leds[p].setColour(makeHSL(h, s, l))
+        }
+    }
+
+    /**
+     * This implements algorithm described here: https://github.com/zaboople/klonk/blob/master/TheGURQ.md
+     * Let's assume that there are states 1,2,3,4,5 and that the user proceeded in the following manner:
+     *  1 -> 2 -> 3 -> 4 (undo) 3 (undo) 2 -> 5
+     *  The undo queue now should be: 2 3 4 3 2 1
+     *  That is, first undo will get me to 2, next to 3, then 4, then back to 3 and so on
+     *  Just before the user went from 2 to 5, the undo queue was: 1 and redo queue was: 3 4
+     *  In other words, when redo queue is not empty, we have to:
+     *      - push there current state
+     *      - push there redo queue without the first (i.e. most advanced) state
+     *      - push there redo queue reversed
+     *      - push current state again
+     *  What are we doing, is recreating the undo queue to the latest known state and then pushing enough undo
+     *  operations to get the current state
+     *
+     *  When there is no redo queue, we just save the current state
+     */
+    function saveUndoRedo() {
+        const curState = saveState()
+        if(redoQueue.length > 0) {
+            undoQueue.push(curState)
+            for (let i = redoQueue.length - 1; i > 0; i--) {
+                undoQueue.push(redoQueue[i])
+            }
+            while (redoQueue.length > 0) {
+                undoQueue.push(redoQueue.shift())
+            }
+        }
+        undoQueue.push(curState)
+    }
+
     const leds = []
     const manager = {}
     const undoQueue = []
+    const redoQueue = []
 
     manager.init = function() {
         for(let l = 0; l < N_LEDS; l++) {
@@ -164,9 +269,33 @@ function makeLedManager() {
     manager.setColour = function(point, pointWidth, colour) {
         let [distance, index] = getClosestSquared(point)
         if(distance < (LED_RADIUS + pointWidth) * (LED_RADIUS + pointWidth) && !leds[index].sameColour(colour)) {
-            undoQueue.push(saveState())
+            saveUndoRedo()
             leds[index].setColour(colour)
         }
+    }
+
+    manager.getColour = function(point, pointWidth, colour) {
+        let [distance, index] = getClosestSquared(point)
+        if(distance < (LED_RADIUS + pointWidth) * (LED_RADIUS + pointWidth) && !leds[index].sameColour(colour)) {
+            return leds[index].getColour()
+        }
+        return null
+    }
+
+    manager.undoStep = function() {
+        if(undoQueue.length === 0)
+            return
+        redoQueue.push(saveState())
+        const state = undoQueue.pop()
+        loadState(state)
+    }
+
+    manager.redoStep = function () {
+        if(redoQueue.length === 0)
+            return
+        undoQueue.push(saveState())
+        const state = redoQueue.pop()
+        loadState(state)
     }
 
     return manager
@@ -192,26 +321,46 @@ function makeToolBox() {
     const toolbox = {
         brush: {
             icon: "paintbrush-2",
-            onclick: () => {
-                document.getElementById("treeCanvas").addEventListener("pointermove", (e) => {
-                    if(e.buttons === 1){
-                        leds.setColour(makePoint(e.offsetX, e.offsetY), e.width / 2, toolbox.colour.getColour())
-                        requestAnimationFrame(paintCanvas)
-                    }
-                })
-
+            handler: (e) => {
+                if(e.buttons === 1){
+                    leds.setColour(makePoint(e.offsetX, e.offsetY), e.width / 2, toolbox.colour.getColour())
+                    requestAnimationFrame(paintCanvas)
+                }
+            },
+            startTool: () => {
+                document.getElementById("treeCanvas").addEventListener("pointermove", toolbox.brush.handler)
+            },
+            endTool: () => {
+                document.getElementById("treeCanvas").removeEventListener("pointermove", toolbox.brush.handler)
             }
         },
         select: {
             icon: "arrow-cursor-1",
-            onclick: () => {}
+            startTool: () => {},
+            endTool: () => {}
+        },
+        undo: {
+            icon: "undo",
+            startTool: () => {
+                leds.undoStep()
+                requestAnimationFrame(paintCanvas)
+            },
+            endTool: () => {}
+        },
+        redo: {
+            icon: "redo",
+            startTool: () => {
+                leds.redoStep()
+                requestAnimationFrame(paintCanvas)
+            },
+            endTool: () => {}
         },
         colour: {
             icon: "",
             getColour: () => {
                 return _selectedColour.copy()
             },
-            onclick: () => {
+            startTool: () => {
                 const closePicker = (ev) => {
                     console.log(ev.target)
                     if(ev.target instanceof HTMLElement) {
@@ -247,7 +396,8 @@ function makeToolBox() {
                     toolbox.colour.div.style.backgroundColor = _selectedColour.getString()
                     //console.log(selectedColour.getString())
                 })
-            }
+            },
+            endTool: () => {}
         }
     }
     for(const [toolName, toolDef] of Object.entries(toolbox)) {
@@ -261,10 +411,11 @@ function makeToolBox() {
         toolDiv.addEventListener("click", () => {
             if(toolbox[_currentTool].icon !== "") {
                 toolbox[_currentTool].div.style.backgroundImage = 'url("include/' + toolbox[_currentTool].icon + '-line.svg")'
+                toolbox[_currentTool].endTool()
             }
             toolbox[toolName].div.style.backgroundImage = 'url("include/' +  toolDef.icon + '-solid.svg")'
             _currentTool = toolName
-            toolDef.onclick()
+            toolDef.startTool()
         })
         toolbox[toolName].div = toolDiv
     }
