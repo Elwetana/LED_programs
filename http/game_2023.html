@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>XTree Painter</title>
     <style>
         div#tools {
@@ -9,8 +10,8 @@
         }
 
         div.tool_item {
-            width: 32px;
-            height: 32px;
+            flex-basis: 20%;
+            aspect-ratio: 1/1;
             background-color: white;
             background-size: cover;
             background-origin: content-box;
@@ -24,6 +25,39 @@
             top: 32px;
             left: 32px;
         }
+
+        div#tools {
+            display: flex;
+            flex-direction: row;
+            width: 100%;
+        }
+        
+        @media screen and (min-resolution: 96dpi) {
+            div#tools {
+                max-width: 320px;
+            }
+        }
+
+        @media screen and (min-resolution: 192dpi) {
+            div#tools {
+                max-width: 640px;
+            }
+        }
+
+        @media screen and (min-resolution: 240dpi) {
+            div#tools {
+                max-width: 800px;
+            }
+        }
+
+        div#tree_container {
+            width: 93vw;
+        }
+
+        canvas#treeCanvas {
+            touch-action: none;
+            width: 100%
+        }
     </style>
     <!-- script src="include/iro.min.js"></script -->
     <script type="module" src="include/tree_painter.js"></script>
@@ -31,9 +65,12 @@
 <body style="background-color: blanchedalmond;">
 <div id="main">
     <p>XTREE</p>
-    <div id="tools"></div>
-    <canvas id="treeCanvas" width="800" height="1200" style="touch-action: none;"></canvas>
-    <div id="picker" style="display: none;"></div>
+    <div id="tree_container">
+        <div id="tools"></div>
+        <canvas id="treeCanvas"></canvas>
+        <div id="picker" style="display: none;"></div>
+    </div>
+    <div id="log" style="width: 100%; height: auto"></div>
 </div>
 </body>
 </html>

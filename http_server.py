@@ -99,16 +99,12 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
         png = pillowImg.new('RGB', (16, 16))
         state = base64.b64decode(base64_state)
         for p in range(len(state) // 3):
-            h = state[3*p+0]
-            s = state[3*p+1]
-            l = state[3*p+2]
-            if s > 128:
-                h |= 256
-                s &= 127
+            r = state[3*p+0]
+            g = state[3*p+1]
+            b = state[3*p+2]
             x = p % 16
             y = p // 16
-            rgb = hls_to_rgb(h / 360, l / 100, s / 100)
-            png.putpixel((x, y), (int(rgb[0] * 255), int(rgb[1]*255), int(rgb[2]*255)))
+            png.putpixel((x, y), (r, g, b))
 
         png.save("http/image.png", "PNG")
 
@@ -281,6 +277,7 @@ if __name__ == "__main__":
     parser.add_argument("-c", "--config_path", help="Controller config path", default="d:\\code\\C++\\filter_test\\LED_controller\\config", type=str)
     args = parser.parse_args()
     server = LEDHttpServer(args)
+    print("Serving on IP %s" % server.serverIP)
     server.start()
     while True:
         pass
