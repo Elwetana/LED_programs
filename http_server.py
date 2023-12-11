@@ -20,10 +20,14 @@ logger = logging.getLogger(__name__)
 class LEDHttpHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
+        isBinary = False
         if len(self.path) > 3 and self.path[-2:] == 'js':
             self.send_header("Content-Type", "text/javascript; charset=UTF-8")
         elif len(self.path) > 4 and self.path[-3:] == 'svg':
             self.send_header("Content-Type", "image/svg+xml")
+        elif len(self.path) > 4 and self.path[-3:] == 'png':
+            self.send_header("Content-Type", "image/png")
+            isBinary = True
         else:
             self.send_header("Content-Type", "text/html; charset=UTF-8")
         self.end_headers()
@@ -79,8 +83,12 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
             return
         fname = "http%s" % self.path
         if os.path.exists(fname):
-            f = open(fname, 'r', encoding="utf-8")
-            self.wfile.write(f.read().encode())
+            if isBinary:
+                f = open(fname, 'rb')
+                self.wfile.write(f.read())
+            else:
+                f = open(fname, 'r', encoding="utf-8")
+                self.wfile.write(f.read().encode())
         else:
             self.wfile.write("FILE NOT FOUND".encode())
             logger.warning("File not found: %s" % fname)
