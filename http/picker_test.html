@@ -2,8 +2,10 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
     <title>colour picker test</title>
-    <script type="module" src="include/tree_painter_colour_picker.js"></script>
+    <!-- script type="module" src="include/tree_painter_colour_picker.js"></script>
     <script type="module">
         document.addEventListener("DOMContentLoaded", start)
         import {makeColourPicker} from "./include/tree_painter_colour_picker.js"
@@ -14,6 +16,9 @@
 
             const p = makeColourPicker(1, makeHSL(0, 100, 50), pickerDiv)
             p.init()
+            p.closeHandler = () => {
+                console.log("closing picker")
+            }
         }
     </script>
     <style>
@@ -23,12 +28,32 @@
         #picker .pickerSlider {
             padding: 5px;
         }
+    </style-->
+    <style>
+        div#picker {
+            width: 95vw;
+            height: 100px;
+            background-color: aquamarine;
+            border: red solid 1px;
+            font-size: 2em;
+        }
     </style>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const logDiv = document.getElementById("log")
+            logDiv.innerHTML += "<p>pixel ratio " + window.devicePixelRatio + "</p>"
+            logDiv.innerHTML += "<p>Window innerWidth " + window.innerWidth + "</p>"
+            logDiv.innerHTML += "<p>Viewport width " + window.visualViewport.width + "</p>"
+            logDiv.innerHTML += "<p>Viewport scale " + window.visualViewport.scale + "</p>"
+        })
+    </script>
 </head>
 <body>
 
     <div id="picker">
+        TEST
     </div>
+    <div id="log"></div>
 
 
 </body>

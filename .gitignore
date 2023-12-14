@@ -5,3 +5,4 @@ led_output.csv
 *.log
 *.svg
 *.docx
+!http/include/*.svg

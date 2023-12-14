@@ -11,7 +11,9 @@ import { makeHSL } from './tree_painter_utils.js'
  */
 export function makeColourPicker(id, colour, pickerDiv) {
 
-    const size = 256
+    const size = Math.round(256 * (1 + (window.devicePixelRatio - 1) / 2) / 2) * 2
+    console.log(size)
+    document.getElementById("log").innerHTML += '<p>Colour picker size ' + size + '</p>'
     let image = new Image
     let canvasWheel = null
     let ctxWheel = null
@@ -19,9 +21,13 @@ export function makeColourPicker(id, colour, pickerDiv) {
     let ctxSlider = null
     let sampler = null
 
+    const closeEvent = new Event("close")
+
     const colorPicker = {
         pickerDiv,
-        colour: colour.copy()
+        colour: colour.copy(),
+        onClose: () => { },
+        onChange: (c) => { }
     }
 
     function loadImage() {
@@ -64,7 +70,9 @@ export function makeColourPicker(id, colour, pickerDiv) {
     function updateColourFromContext(ctx, ev) {
         if("buttons" in ev && ev.buttons !== 1)
             return
-        ev.preventDefault();
+        ev.preventDefault()
+        ev.stopPropagation()
+        //console.log(ev.target)
         const x = Math.round(ev.offsetX)
         const y = Math.round(ev.offsetY)
         let imageData = ctx.getImageData(x, y, 1, 1);
@@ -73,6 +81,7 @@ export function makeColourPicker(id, colour, pickerDiv) {
         const b = imageData.data[2]
         colorPicker.colour = makeHSL(0,0,0)
         colorPicker.colour.setFromRGB({r, g, b})
+        colorPicker.onChange(colorPicker.colour.copy())
         updateSamplerAndSlider()
     }
 
@@ -98,7 +107,9 @@ export function makeColourPicker(id, colour, pickerDiv) {
         canvasWheel.addEventListener("pointermove", selectHS)
         canvasSlider.addEventListener("pointerdown", selectL)
         canvasSlider.addEventListener("pointermove", selectL)
+        sampler.addEventListener("pointerdown", () => { colorPicker.onClose() })
     }
 
+    colorPicker.init()
     return colorPicker
 }
