@@ -34,6 +34,10 @@ document.addEventListener('DOMContentLoaded', start)
 function makeLedManager(canvas) {
 
     /* Config */
+    const sizeConfig = [
+        { LED_RADIUS: 16, LED_X_SPACE: 12, LED_Y_SPACE: 20, LED_SELECT_WIDTH: 3 },
+        { LED_RADIUS: 11, LED_X_SPACE: 8, LED_Y_SPACE: 12, LED_SELECT_WIDTH: 2 }
+    ]
     const LED_RADIUS = 16
     const LED_SELECT_WIDTH = 3
     const N_LEDS = 200
@@ -43,6 +47,8 @@ function makeLedManager(canvas) {
     let _isSelection = false
     const _leds = []
     let _weakSave = null
+    let _positionMode = ""
+    let _activeConfig = 0
 
     const manager = {
         canvas
@@ -73,12 +79,12 @@ function makeLedManager(canvas) {
                 ctx.fillStyle = led._colour.l > 50 ? "#993333" : "#cc6666"
                 ctx.beginPath()
                 ctx.arc(led._canvasPosition.x, led._canvasPosition.y,
-                    (LED_RADIUS + LED_SELECT_WIDTH) * manager.pixelRatio, 0, 2*Math.PI)
+                    (sizeConfig[_activeConfig].LED_RADIUS + sizeConfig[_activeConfig].LED_SELECT_WIDTH) * manager.pixelRatio, 0, 2*Math.PI)
                 ctx.fill()
             }
             ctx.fillStyle = led._colour.getString()
             ctx.beginPath()
-            ctx.arc(led._canvasPosition.x, led._canvasPosition.y, LED_RADIUS * manager.pixelRatio, 0, 2*Math.PI)
+            ctx.arc(led._canvasPosition.x, led._canvasPosition.y, sizeConfig[_activeConfig].LED_RADIUS * manager.pixelRatio, 0, 2*Math.PI)
             ctx.fill()
         }
         return led
@@ -263,15 +269,17 @@ function makeLedManager(canvas) {
         selectedOnly &&= _isSelection
         fromIndex = Math.max(0, fromIndex)
         toIndex = Math.min(N_LEDS - 1, toIndex)
-        const steps = Math.abs(toIndex - fromIndex)
+        let steps = toIndex - fromIndex
+        const sign = Math.sign(steps)
+        steps = Math.abs(steps)
         const hueDelta = (toColour.h - fromColour.h) / steps
         const saturationDelta =  (toColour.s - fromColour.s) / steps
         const lightnessDelta = (toColour.l - fromColour.l) / steps
         for(let i = 0; i <= steps; i++) {
-            if(!selectedOnly || _leds[fromIndex + i].selected) {
-                _leds[fromIndex + i]._colour.h = fromColour.h + hueDelta * i
-                _leds[fromIndex + i]._colour.s = fromColour.s + saturationDelta * i
-                _leds[fromIndex + i]._colour.l = fromColour.l + lightnessDelta * i
+            if(!selectedOnly || _leds[fromIndex + i * sign].selected) {
+                _leds[fromIndex + i * sign]._colour.h = fromColour.h + hueDelta * i
+                _leds[fromIndex + i * sign]._colour.s = fromColour.s + saturationDelta * i
+                _leds[fromIndex + i * sign]._colour.l = fromColour.l + lightnessDelta * i
             }
         }
     }
@@ -289,45 +297,75 @@ function makeLedManager(canvas) {
     manager.init()
     let _currentState = saveState()
 
-    manager.positionLEDs = function(mode) {
+    manager.selectSize = function (sizeIndex) {
+        if(sizeIndex < sizeConfig.length && sizeIndex >= 0) {
+            _activeConfig = sizeIndex
+        }
+    }
+
+    manager.positionLEDs = function(mode="") {
         const w = canvas.offsetWidth
         manager.pixelRatio = 1 / window.visualViewport.scale //window.devicePixelRatio
 
-        const LED_X_SPACE = 20 * (1 + (manager.pixelRatio - 1) / 2)
-        const LED_Y_SPACE = 30 * (1 + (manager.pixelRatio - 1) / 2)
-        const led_radius = LED_RADIUS * manager.pixelRatio
+        const LED_X_SPACE = sizeConfig[_activeConfig].LED_X_SPACE * manager.pixelRatio
+        const LED_Y_SPACE = sizeConfig[_activeConfig].LED_Y_SPACE * manager.pixelRatio
+        const LED_RADIUS = sizeConfig[_activeConfig].LED_RADIUS * manager.pixelRatio
+
+        const ledWidth = Math.floor(2 * LED_RADIUS + LED_X_SPACE)
+        const ledHeight = Math.floor(2 * LED_RADIUS + LED_Y_SPACE)
+        const effectiveWidth = Math.floor(w / ledWidth) * ledWidth
+        const ledsPerRow = effectiveWidth / ledWidth
+        manager.canvas.width = effectiveWidth
+        manager.canvas.style.width = effectiveWidth + "px"
+        /* console.log("w", effectiveWidth, "h", h,
+            "led distance^2", (ledWidth + ledHeight) * (ledWidth + ledHeight) / 4,
+            "radius^2", led_radius * led_radius) */
+
         let calcPosition = (i) => { return [0, 0] }
-        if(mode === "LINE_L2R") {
-            /*  |  radius
-                |  vvv
-                |..___c___....___c___..| => width = 22, x_space = 4, radius = 3.5
-                |^^
-                |x_space /2
-            */
-            const ledWidth = Math.floor(2 * led_radius + LED_X_SPACE)
-            const ledHeight = Math.floor(2 * led_radius + LED_Y_SPACE)
-            const effectiveWidth = Math.floor(w / ledWidth) * ledWidth
-            calcPosition = (l) => {
-                const x = Math.floor((l * ledWidth) % effectiveWidth + ledWidth / 2)
-                const y = Math.floor(l * ledWidth/effectiveWidth) * ledHeight + ledHeight / 2
-                return [x, y]
-            }
-            const ledsPerRow = effectiveWidth / ledWidth
-            const nRows = Math.ceil(N_LEDS / ledsPerRow)
-            const h = nRows * ledHeight
-            manager.canvas.width = effectiveWidth
-            manager.canvas.height = h
-            manager.canvas.style.width = effectiveWidth + "px"
-            /* console.log("w", effectiveWidth, "h", h,
-                "led distance^2", (ledWidth + ledHeight) * (ledWidth + ledHeight) / 4,
-                "radius^2", led_radius * led_radius) */
+        if(mode === "") {
+            mode = _positionMode
         }
-        else {
-            console.log("Positioning not implemented " + mode)
+        switch(mode) {
+            case "LINE_L2R":
+                /*  |  radius
+                    |  vvv
+                    |..___c___....___c___..| => width = 22, x_space = 4, radius = 3.5
+                    |^^
+                    |x_space /2
+                */
+                calcPosition = (l) => {
+                    const x = Math.floor((l * ledWidth) % effectiveWidth + ledWidth / 2)
+                    const y = Math.floor(l * ledWidth / effectiveWidth) * ledHeight + ledHeight / 2
+                    return [x, y]
+                }
+                manager.canvas.height = ledHeight * Math.ceil(N_LEDS / ledsPerRow)
+                break
+            case "LINE_WRAP":
+                /*  - 0 1 2    all leds are shifted by 1, so that 0th led needs not to be shifted up
+                            3
+                      6 5 4
+                    7
+                      8 9 ... odd rows are left to right, even are right to left, first and last led is offset down by half row
+                 because of that we can fit only (ledsPerRow - 1) leds
+                 */
+                calcPosition = (l) => {
+                    let ll = l + 1
+                    const row = Math.floor(ll / (ledsPerRow - 1))
+                    ll += row
+                    const col = (row % 2 === 0) ? ll % ledsPerRow : ledsPerRow - (ll % ledsPerRow) - 1
+                    const x = col * ledWidth + ledWidth / 2
+                    const y = row * ledHeight + ledHeight / 2 - ((col === 0 || col === ledsPerRow - 1) ? ledHeight / 2 : 0)
+                    return [x, y]
+                }
+                manager.canvas.height = ledHeight * Math.ceil((N_LEDS + 1) / (ledsPerRow - 1))
+                break
+            default:
+                console.log("Positioning not implemented " + mode)
         }
         for(let l = 0; l < N_LEDS; l++) {
             _leds[l].setPosition(...calcPosition(l))
         }
+        _positionMode = mode
     }
 
     /**
@@ -340,7 +378,7 @@ function makeLedManager(canvas) {
     function getLED(point, pointWidth, ignoreRadius=false) {
         let [distance, index] = getClosestSquared(point)
         const touchWidth = pointWidth * manager.pixelRatio
-        const led_radius = LED_RADIUS * manager.pixelRatio
+        const led_radius = sizeConfig[_activeConfig].LED_RADIUS * manager.pixelRatio
         //console.log(distance, index, (led_radius + touchWidth) * (led_radius + touchWidth))
         if(ignoreRadius || distance < (led_radius + touchWidth) * (led_radius + touchWidth)) {
             return index
@@ -348,9 +386,11 @@ function makeLedManager(canvas) {
         return -1
     }
 
-    manager.setColour = function(point, pointWidth, colour) {
+    manager.setColour = function(point, pointWidth, colour, selectedOnly=true) {
+        selectedOnly &&= _isSelection
         const index = getLED(point, pointWidth)
-        if(index > -1 && !_leds[index].sameColour(colour)) {
+        console.log(index)
+        if(index > -1 && !_leds[index].sameColour(colour) && (!selectedOnly || _leds[i].selected)) {
             saveUndoRedo()
             _leds[index].setColour(colour)
             _currentState = saveState()
@@ -513,7 +553,7 @@ function makeLedManager(canvas) {
     manager.paintCanvas = () => {
         //const canvas = document.getElementById("treeCanvas")
         const ctx = manager.canvas.getContext("2d");
-        ctx.fillStyle = "#FFF"
+        ctx.fillStyle = "#888"
         ctx.fillRect(0, 0, manager.canvas.width, manager.canvas.height)
         for(let l = 0; l < N_LEDS; l++) {
             _leds[l].paint(ctx)
@@ -532,6 +572,8 @@ function makeCommunicator() {
     }
 
     function sendToServer() {
+        if(!isLive)
+            return
         // /msg/set?<base64 encoded state>
         const msg = "/msg/set?" + btoa(String.fromCodePoint(...lastState))
         fetch( msg, {
@@ -570,6 +612,7 @@ function makeCommunicator() {
     let lastUpdate = 0
     let lastState
     let updateQueued = false
+    let isLive = true
 
     const comm = {
         transmitState: (state) => {
@@ -588,7 +631,9 @@ function makeCommunicator() {
                 console.log("update already queued")
             }
         },
-        loadLocalState: () => { return loadLocally() }
+        loadLocalState: () => { return loadLocally() },
+        setLiveConnection: (value) => { isLive = value },
+        getLiveConnection: () => { return isLive }
     }
     return comm
 }
@@ -597,8 +642,9 @@ const comm = makeCommunicator()
 const ledsManger = makeLedManager(document.getElementById("treeCanvas"))
 
 function start() {
-    const toolbox = makeToolBox(ledsManger)
-    ledsManger.positionLEDs('LINE_L2R')
+    const toolbox = makeToolBox(ledsManger, comm)
+    //ledsManger.positionLEDs('LINE_L2R')
+    ledsManger.positionLEDs('LINE_WRAP')
     ledsManger.paintCanvas()
     const logDiv = document.getElementById("log")
     logDiv.innerHTML += "<p>pixel ratio " + window.devicePixelRatio + "</p>"

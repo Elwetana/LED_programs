@@ -69,6 +69,37 @@
             touch-action: none;
             width: 100%
         }
+
+        div.help_tool_container {
+            display: flex;
+            flex-direction: column;
+            background-color: white;
+        }
+        div.help_tool_container div.help_tool_row {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 4%;
+        }
+        div.help_tool_container div.help_tool_icon {
+            flex-basis: 16.6%;
+            box-sizing: border-box;
+            flex-grow: 0;
+            flex-shrink: 0;
+            aspect-ratio: 1/1;
+            background-color: white;
+            background-size: cover;
+            background-origin: content-box;
+            background-repeat: no-repeat;
+            padding: 4%;
+        }
+        div.help_tool_container div.help_tool_text {
+            font-size: 1rem;
+            flex-basis: 83%;
+            padding: 0 4%;
+            align-self: center;
+        }
+
+
     </style>
     <!-- script src="include/iro.min.js"></script -->
     <script type="module" src="include/tree_painter.js"></script>
@@ -81,6 +112,7 @@
             <div id="toolbar"></div>
             <div id="toolbox"></div>
             <div id="picker" style="display: none;"></div>
+            <div id="help" style="display: none"></div>
         </div>
         <canvas id="treeCanvas"></canvas>
     </div>
