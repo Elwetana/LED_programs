@@ -1,23 +1,23 @@
 /*
 TODO:
 
-[.] Brush tool
-[ ] Pan/move tool -- move the whole pattern along the chain (or only just selection?)
+[.] Brush tool -- add respect selection
+[x] Pan/move tool -- move the whole pattern along the chain (or only just selection?)
 [ ] Select tool
-[ ] Eye dropper tool
+[x] Eye dropper tool
 [ ] Gradient
-[ ] Globally adjust saturation, lightness
-[ ] Preview mode for global adjustment
+[x] Globally adjust saturation, lightness
+[-] Preview mode for global adjustment
 [ ] Other chain display configurations
 [ ] Timeline and Keyframes
 [x] Undo/Redo
 [.] Communication with server
 [ ] Allow disabling live server connection
-[ ] Split toolbox and toolbar
+[x] Split toolbox and toolbar
 [ ] Saving selections
 [.] Save/load in general -- on server? Locally?
 [.] More responsive design
-[ ] Toolbox & toolbar position: fixed
+[x] Toolbox & toolbar position: sticky
 */
 
 import './iro.min.js'
@@ -42,7 +42,7 @@ function makeLedManager(canvas) {
     const _redoQueue = []
     let _isSelection = false
     const _leds = []
-
+    let _weakSave = null
 
     const manager = {
         canvas
@@ -142,7 +142,7 @@ function makeLedManager(canvas) {
      */
     function saveUndoRedo() {
         if(_redoQueue.length > 0) {
-            _undoQueue.push(currentState)
+            _undoQueue.push(_currentState)
             for (let i = _redoQueue.length - 1; i > 0; i--) {
                 _undoQueue.push(_redoQueue[i])
             }
@@ -150,7 +150,7 @@ function makeLedManager(canvas) {
                 _undoQueue.push(_redoQueue.shift())
             }
         }
-        _undoQueue.push(currentState)
+        _undoQueue.push(_currentState)
     }
 
     /**
@@ -183,9 +183,7 @@ function makeLedManager(canvas) {
     function moveColours({amount, fromIndex = 0, toIndex = N_LEDS, wrap = true,
                          selectedOnly = true, wrapColour = makeHSL(0, 0, 0)}) {
         saveUndoRedo()
-        if(!_isSelection) {
-            selectedOnly = false
-        }
+        selectedOnly &&= _isSelection
         if(amount < 0) {
             amount += N_LEDS
         }
@@ -230,8 +228,52 @@ function makeLedManager(canvas) {
                 _leds[ledIndex - amount].selected : selectBuff[ledIndex - fromIndex]
             ledIndex--
         }
-        currentState = saveState()
-        comm.transmitState(currentState)
+    }
+
+    function shiftLedsHLS(amount, selectedOnly, shiftFunction) {
+        selectedOnly &&= _isSelection
+        for(let i = 0; i < N_LEDS; i++) {
+            if(!selectedOnly || _leds[i].selected) {
+                shiftFunction(i, amount)
+            }
+        }
+    }
+
+    function paintLeds(fromIndex, toIndex, colour, selectedOnly=true) {
+        selectedOnly &&= _isSelection
+        fromIndex = Math.max(0, fromIndex)
+        toIndex = Math.min(N_LEDS - 1, toIndex)
+        for(let i = fromIndex; i <= toIndex; i++) {
+            if(!selectedOnly || _leds[i].selected) {
+                _leds[i]._colour.update(colour)
+            }
+        }
+    }
+
+    /**
+     * fromIndex = 0, toIndex = 3 => steps = 3
+     * fromColor = 20, toColour = 50 => delta = 10
+     * @param {number} fromIndex
+     * @param {number} toIndex
+     * @param {HSLColour} fromColour
+     * @param {HSLColour} toColour
+     * @param {boolean} selectedOnly
+     */
+    function paintGradient(fromIndex, toIndex, fromColour, toColour, selectedOnly=true) {
+        selectedOnly &&= _isSelection
+        fromIndex = Math.max(0, fromIndex)
+        toIndex = Math.min(N_LEDS - 1, toIndex)
+        const steps = Math.abs(toIndex - fromIndex)
+        const hueDelta = (toColour.h - fromColour.h) / steps
+        const saturationDelta =  (toColour.s - fromColour.s) / steps
+        const lightnessDelta = (toColour.l - fromColour.l) / steps
+        for(let i = 0; i <= steps; i++) {
+            if(!selectedOnly || _leds[fromIndex + i].selected) {
+                _leds[fromIndex + i]._colour.h = fromColour.h + hueDelta * i
+                _leds[fromIndex + i]._colour.s = fromColour.s + saturationDelta * i
+                _leds[fromIndex + i]._colour.l = fromColour.l + lightnessDelta * i
+            }
+        }
     }
 
     manager.init = function() {
@@ -245,7 +287,7 @@ function makeLedManager(canvas) {
     }
 
     manager.init()
-    let currentState = saveState()
+    let _currentState = saveState()
 
     manager.positionLEDs = function(mode) {
         const w = canvas.offsetWidth
@@ -311,8 +353,8 @@ function makeLedManager(canvas) {
         if(index > -1 && !_leds[index].sameColour(colour)) {
             saveUndoRedo()
             _leds[index].setColour(colour)
-            currentState = saveState()
-            comm.transmitState(currentState)
+            _currentState = saveState()
+            comm.transmitState(_currentState)
         }
     }
 
@@ -324,18 +366,41 @@ function makeLedManager(canvas) {
         return null
     }
 
-    manager.selectLed = function (point, pointWidth) {
+    manager.selectLed = function (point, pointWidth, addToSelection=true) {
         const index = getLED(point, pointWidth)
         if(index > -1) {
-            _leds[index].selected = true
-            _isSelection = true
+            _leds[index].selected = addToSelection
+            if(!addToSelection) { //if subtracting, we have to check if there is any selected led remaining
+                _isSelection = false
+                for(let i = 0; i < N_LEDS; i++) {
+                    if(_leds[i].selected) {
+                        _isSelection = true
+                        break
+                    }
+                }
+            }
+            else {
+                _isSelection = true
+            }
         }
     }
 
     manager.selectNone = function () {
-        _isSelection = false
         for(let i = 0; i < N_LEDS; i++) {
             _leds[i].selected = false
+        }
+        _isSelection = false
+    }
+
+    manager.unifySelection = function () {
+        if(!_isSelection)
+            return
+        let startIndex = -1
+        while(!_leds[++startIndex].selected) {}
+        let endIndex = N_LEDS
+        while(!_leds[--endIndex].selected) {}
+        for(let i = startIndex; i < endIndex; i++) {
+            _leds[i].selected = true
         }
     }
 
@@ -343,42 +408,105 @@ function makeLedManager(canvas) {
      *
      * @param {Point} pointFrom
      * @param {Point} pointTo
-     * @param {number} pointWidth
+     * @param {number} touchWidth
      * @param {boolean} selectedOnly
      * @param {boolean} wrap
      * @param {HSLColour} wrapColour
      * @return {number}
      */
-    manager.move = function (pointFrom, pointTo, pointWidth, selectedOnly, wrap, wrapColour) {
-        const fromIndex = getLED(pointFrom, pointWidth, true)
-        const toIndex = getLED(pointTo, pointWidth, true)
+    manager.move = function (pointFrom, pointTo, touchWidth, selectedOnly, wrap, wrapColour) {
+        const fromIndex = getLED(pointFrom, touchWidth, true)
+        const toIndex = getLED(pointTo, touchWidth, true)
         const amount = toIndex - fromIndex
 
         if(amount === 0) {
             return 0
         }
+        if(_weakSave !== null) {
+            loadState(_weakSave)
+        } else {
+            _weakSave = saveState()
+        }
         moveColours({amount, wrap, selectedOnly, wrapColour})
         return Math.abs(amount)
     }
 
+    /**
+     * The behaviour depends on the presence of selection: without selection, only gradient is created between
+     * fromPoint and toPoint; with selection, the selected leds before fromPoint get the fromColour, and selected
+     * leds after toPoint get toColour
+     * @param {Point} pointFrom
+     * @param {Point} pointTo
+     * @param {number} touchWidth
+     * @param {HSLColour} colourFrom
+     * @param {HSLColour} colourTo
+     * @return {number}
+     */
+    manager.gradient = function (pointFrom, pointTo, touchWidth, colourFrom, colourTo) {
+        const indexFrom = getLED(pointFrom, touchWidth, true)
+        const indexTo = getLED(pointTo, touchWidth, true)
+        const amount = indexTo - indexFrom
+
+        if(amount === 0) {
+            return 0
+        }
+        if(_weakSave !== null) {
+            loadState(_weakSave)
+        } else {
+            _weakSave = saveState()
+        }
+        if(_isSelection) {
+            paintLeds(0, indexFrom, colourFrom)
+            paintLeds(indexTo, N_LEDS - 1, colourTo)
+        }
+        paintGradient(indexFrom, indexTo, colourFrom, colourTo)
+        return Math.abs(amount)
+    }
+
+    manager.shiftHue = function (amount, selectedOnly=true) {
+        shiftLedsHLS(amount, selectedOnly, (i, amount) => {
+            _leds[i]._colour.shiftHue(amount)
+        })
+    }
+
+    manager.shiftSaturation = function (amount, selectedOnly=true) {
+        shiftLedsHLS(amount, selectedOnly, (i, amount) => {
+            _leds[i]._colour.shiftSaturation(amount)
+        })
+    }
+
+    manager.shiftLightness = function (amount, selectedOnly=true) {
+        shiftLedsHLS(amount, selectedOnly, (i, amount) => {
+            _leds[i]._colour.shiftLightness(amount)
+        })
+    }
+
     manager.undoStep = function() {
+        //console.log("undo queue " + _undoQueue.length + " redo queue " + _redoQueue.length)
         if(_undoQueue.length === 0)
             return
-        _redoQueue.push(currentState)
-        currentState = _undoQueue.pop()
-        loadState(currentState)
+        _redoQueue.push(_currentState)
+        _currentState = _undoQueue.pop()
+        loadState(_currentState)
     }
 
     manager.redoStep = function () {
         if(_redoQueue.length === 0)
             return
-        _undoQueue.push(currentState)
-        currentState = _redoQueue.pop()
-        loadState(currentState)
+        _undoQueue.push(_currentState)
+        _currentState = _redoQueue.pop()
+        loadState(_currentState)
+    }
+
+    manager.applyState = function () {
+        _weakSave = null
+        saveUndoRedo()
+        _currentState = saveState()
+        comm.transmitState(_currentState)
     }
 
     manager.getStateBase64 = () => {
-        const binString = String.fromCodePoint(...currentState);
+        const binString = String.fromCodePoint(..._currentState);
         return btoa(binString)
     }
 

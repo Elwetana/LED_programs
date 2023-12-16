@@ -8,7 +8,7 @@
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    inkscape:version="1.0beta2 (074b463, 2020-02-02)"
-   sodipodi:docname="swap-color-line.svg"
+   sodipodi:docname="capital-H-line.svg"
    id="svg845"
    version="1.1"
    width="14"
@@ -34,8 +34,8 @@
      inkscape:window-maximized="1"
      inkscape:window-y="-8"
      inkscape:window-x="-8"
-     inkscape:cy="6.4699672"
-     inkscape:cx="4.7651353"
+     inkscape:cy="8.2287651"
+     inkscape:cx="6.6508236"
      inkscape:zoom="47.426662"
      showgrid="false"
      id="namedview847"
@@ -52,38 +52,12 @@
      inkscape:document-rotation="0"
      inkscape:object-paths="true" />
   <g
-     transform="translate(0.0566335,0.90924932)"
-     id="g859">
-    <g
-       id="g845">
-      <path
-         sodipodi:nodetypes="cc"
-         inkscape:connector-curvature="0"
-         id="path1479"
-         d="M 1.0564675,2.4490579 H 11.123259"
-         style="fill:none;fill-opacity:1;stroke:#060606;stroke-width:1;stroke-opacity:1" />
-      <path
-         id="path1493"
-         style="fill:none;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
-         d="M 9.4437751,4.1290178 11.123259,2.4490579 9.4437751,0.76909807"
-         inkscape:connector-curvature="0"
-         sodipodi:nodetypes="ccc" />
-    </g>
-    <g
-       id="g851"
-       transform="matrix(-1,0,0,1,12.886733,6.2833855)">
-      <path
-         style="fill:none;fill-opacity:1;stroke:#060606;stroke-width:1;stroke-opacity:1"
-         d="M 1.0564675,2.4490579 H 11.123259"
-         id="path847"
-         inkscape:connector-curvature="0"
-         sodipodi:nodetypes="cc" />
-      <path
-         sodipodi:nodetypes="ccc"
-         inkscape:connector-curvature="0"
-         d="M 9.4437751,4.1290178 11.123259,2.4490579 9.4437751,0.76909807"
-         style="fill:none;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
-         id="path849" />
-    </g>
+     style="font-size:17.823px;line-height:1.25;font-family:Arial;-inkscape-font-specification:'Arial Normal';letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke-width:1"
+     id="text2026"
+     aria-label="H">
+    <path
+       id="path2031"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:'Arial Rounded MT Bold';-inkscape-font-specification:'Arial Rounded MT Bold, ';stroke-width:1"
+       d="M 3.6862241,1.436597 V 5.0917044 H 9.2646142 V 1.436597 q 0,-0.78323734 0.3481055,-1.17485599 0.3568081,-0.39161865 0.9311823,-0.39161865 0.583076,0 0.939885,0.39161865 0.36551,0.38291601 0.36551,1.17485599 v 10.051545 q 0,0.79194 -0.36551,1.183559 -0.365511,0.391619 -0.939885,0.391619 -0.5830769,0 -0.9311823,-0.391619 Q 9.2646142,12.27138 9.2646142,11.488142 V 7.1977425 H 3.6862241 v 4.2903995 q 0,0.79194 -0.3655108,1.183559 -0.3655107,0.391619 -0.9398847,0.391619 -0.5830767,0 -0.9311821,-0.391619 Q 1.101541,12.27138 1.101541,11.488142 V 1.436597 q 0,-0.78323734 0.3394028,-1.17485599 0.3481055,-0.39161865 0.9398848,-0.39161865 0.5830766,0 0.9398847,0.39161865 0.3655108,0.38291601 0.3655108,1.17485599 z" />
   </g>
 </svg>

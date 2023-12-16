@@ -6,7 +6,7 @@
     <title>XTree Painter</title>
     <style>
         div#tools {
-            /*position: sticky;*/
+            position: sticky;
             flex-direction: row;
             width: 100%;
             top: 5px;
@@ -14,22 +14,27 @@
 
         div#tools > div {
             display: flex;
+            margin: 0.1vw;
         }
 
-        div.tool_item {
+        .tool_item {
             flex-basis: 16.6%;
+            box-sizing: border-box;
             aspect-ratio: 1/1;
             background-color: white;
             background-size: cover;
             background-origin: content-box;
             background-repeat: no-repeat;
-            padding: 4px;
-            /*background-image: url("include/paintbrush-2-line.svg");*/
+            padding: 4%;
+        }
+
+        .tool_item5 {
+            flex-basis: 83%;
+            box-sizing: border-box;
         }
 
         div.colour_selected {
-            outline: black 3px solid;
-            outline-offset: -3px;
+            border: black 0.3em solid;
         }
 
         div#picker {
@@ -75,9 +80,9 @@
         <div id="tools">
             <div id="toolbar"></div>
             <div id="toolbox"></div>
+            <div id="picker" style="display: none;"></div>
         </div>
         <canvas id="treeCanvas"></canvas>
-        <div id="picker" style="display: none;"></div>
     </div>
     <div id="log" style="width: 100%; height: auto"></div>
 </div>

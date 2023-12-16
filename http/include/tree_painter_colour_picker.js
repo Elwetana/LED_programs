@@ -12,7 +12,7 @@ import { makeHSL } from './tree_painter_utils.js'
 export function makeColourPicker(id, colour, pickerDiv) {
 
     const size = Math.round(256 * (1 + (window.devicePixelRatio - 1) / 2) / 2) * 2
-    console.log(size)
+    //console.log(size)
     document.getElementById("log").innerHTML += '<p>Colour picker size ' + size + '</p>'
     let image = new Image
     let canvasWheel = null
@@ -71,7 +71,7 @@ export function makeColourPicker(id, colour, pickerDiv) {
         if("buttons" in ev && ev.buttons !== 1)
             return
         ev.preventDefault()
-        ev.stopPropagation()
+        ev.stopImmediatePropagation()
         //console.log(ev.target)
         const x = Math.round(ev.offsetX)
         const y = Math.round(ev.offsetY)
@@ -107,7 +107,11 @@ export function makeColourPicker(id, colour, pickerDiv) {
         canvasWheel.addEventListener("pointermove", selectHS)
         canvasSlider.addEventListener("pointerdown", selectL)
         canvasSlider.addEventListener("pointermove", selectL)
-        sampler.addEventListener("pointerdown", () => { colorPicker.onClose() })
+        sampler.addEventListener("pointerdown", (ev) => {
+            ev.preventDefault()
+            ev.stopImmediatePropagation()
+            colorPicker.onClose()
+        })
     }
 
     colorPicker.init()

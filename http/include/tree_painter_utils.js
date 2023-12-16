@@ -83,6 +83,21 @@ export function makeHSL(h, s, l) {
         return "hsl(" + hsl.h + " " + hsl.s + "% " + hsl.l + "%)"
     }
 
+    hsl.shiftHue = (amount) => {
+        //hsl.h = clamp(hsl.h + amount, 0, 360)
+        hsl.h += amount
+        if(hsl.h < 360) hsl.h += 360
+        if(hsl.h > 360) hsl.h -= 360
+    }
+
+    hsl.shiftSaturation = (amount) => {
+        hsl.s = clamp(hsl.s + amount, 0, 100)
+    }
+
+    hsl.shiftLightness = (amount) => {
+        hsl.l = clamp(hsl.l + amount, 0, 100)
+    }
+
     function clamp(num, min, max) {
         return Math.min(Math.max(num, min), max);
     }
