@@ -11,8 +11,8 @@ import { makeHSL } from './tree_painter_utils.js'
  */
 export function makeColourPicker(id, colour, pickerDiv) {
 
-    const size = Math.round(256 * (1 + (window.devicePixelRatio - 1) / 2) / 2) * 2
-    //console.log(size)
+    const size = document.getElementById("tools").clientWidth / 2 //this is a last minute hack, but #picker is now hidden and has no width
+    console.log(size)
     document.getElementById("log").innerHTML += '<p>Colour picker size ' + size + '</p>'
     let image = new Image
     let canvasWheel = null
@@ -67,7 +67,7 @@ export function makeColourPicker(id, colour, pickerDiv) {
         //colorPicker.slider.style.background = 'linear-gradient(90deg, white,' + sliderColour.getString() + ", black)"
     }
 
-    function updateColourFromContext(ctx, ev) {
+    function updateColourFromContext(ctx, ev, noBlack=false) {
         if("buttons" in ev && ev.buttons !== 1)
             return
         ev.preventDefault()
@@ -79,6 +79,8 @@ export function makeColourPicker(id, colour, pickerDiv) {
         const r = imageData.data[0]
         const g = imageData.data[1]
         const b = imageData.data[2]
+        if(r == 0 && g == 0 && b == 0 && noBlack)
+            return
         colorPicker.colour = makeHSL(0,0,0)
         colorPicker.colour.setFromRGB({r, g, b})
         colorPicker.onChange(colorPicker.colour.copy())
@@ -86,7 +88,7 @@ export function makeColourPicker(id, colour, pickerDiv) {
     }
 
     function selectHS(ev) {
-        updateColourFromContext(ctxWheel, ev)
+        updateColourFromContext(ctxWheel, ev, true)
     }
 
     function selectL(ev) {

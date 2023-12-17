@@ -16,7 +16,8 @@ from PIL import Image as pillowImg
 from colorsys import hls_to_rgb
 
 logger = logging.getLogger(__name__)
-
+N_LEDS = 200
+N_THUMB_SIZE = 16
 
 class LEDHttpHandler(BaseHTTPRequestHandler):
 
@@ -135,14 +136,31 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
         [result.extend(x) for x in categories.values()]
         self.wfile.write(json.dumps({"result": "ok", "names": result}).encode())
 
-    def save_state(self, folder, save_name, state):
-        save_folder = "saves/%s" % folder
+    def save_state(self, folder_name, save_name, state):
+        save_folder = "saves/%s" % folder_name
         if not os.path.exists(save_folder) or not os.path.isdir(save_folder):
             if os.path.exists(save_folder) and not os.path.isdir(save_folder):
                 os.remove(save_folder)
             os.mkdir(save_folder)
         LEDHttpHandler.save_state_as_png(state, os.path.join(save_folder, save_name + ".png"))
         self.wfile.write('{"result":"ok"}'.encode())
+
+    def load_saves(self, folder_name):
+        result = {"saves": {}}
+        save_folder = "saves/%s" % folder_name
+        print("loading form %s" % save_folder)
+        if os.path.exists(save_folder) and os.path.isdir(save_folder):
+            all_stuff = os.listdir(save_folder)
+            print(all_stuff)
+            for stuff in all_stuff:
+                file_name = os.path.join(save_folder, stuff)
+                if os.path.isfile(file_name):
+                    print("loading %s" % file_name)
+                    base64_state = LEDHttpHandler.load_state_from_png(file_name)
+                    name, ext = os.path.splitext(file_name)
+                    result["saves"][name] = base64_state
+        result["result"] = "ok"
+        self.wfile.write(json.dumps(result).encode())
 
     def serve_save(self):
         """
@@ -153,12 +171,14 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
         :return:
         """
         qq = self.split_arguments()
-        if "get_names" in qq:
+        if "get_names" in qq and "folder" in qq and qq["folder"] != "":
             self.get_save_names(qq["folder"], 9)
-        elif "save_as" in qq:
+        elif "save_as" in qq and "folder" in qq and "name" in qq and qq["folder"] != "" and qq["name"] != "":
             self.save_state(qq["folder"], qq["name"], qq["state"])
+        elif "load" in qq and "folder" in qq and qq["folder"] != "":
+            self.load_saves(qq["folder"])
         else:
-            self.wfile.write(('{"result":"error", "reason":"Unknown save command %s"}' % self.path).encode())
+            self.wfile.write(('{"result":"error", "reason":"Unknown save command or missing parameters %s"}' % self.path).encode())
 
     def do_GET(self):
         # Send headers
@@ -206,18 +226,16 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
     @staticmethod
     def save_state_as_png(base64_state, file_name):
         state = base64.b64decode(base64_state)
-        """
-        png = pillowImg.new('RGB', (16, 16))
-        for p in range(len(state) // 3):
-            r = state[3*p+0]
-            g = state[3*p+1]
-            b = state[3*p+2]
-            x = p % 16
-            y = p // 16
-            png.putpixel((x, y), (r, g, b))
-        """
-        png = pillowImg.frombytes("RGB", (16, 16), state + bytes(3*56))
+        missing_bytes = (N_THUMB_SIZE * N_THUMB_SIZE - N_LEDS) * 3 
+        png = pillowImg.frombytes("RGB", (N_THUMB_SIZE, N_THUMB_SIZE), state + bytes(missing_bytes))
         png.save(file_name, "PNG")
+
+    @staticmethod
+    def load_state_from_png(file_name):
+        png = pillowImg.open(file_name)
+        state = png.tobytes()[0 : N_LEDS * 3]
+        base64_state = base64.b64encode(state).decode('utf-8')
+        return base64_state
 
     def get_config(self):
         if not os.path.exists(self.server.config_path):

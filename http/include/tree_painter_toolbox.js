@@ -25,6 +25,9 @@ export function makeToolBox(leds, comm) {
     let _currentTool = 'brush'
     let _currentToolbar = []
 
+    const THUMB_WIDTH = 16
+    const THUMB_HEIGHT = 16
+
     function createHelp() {
 
         function createDiv(parent, className) {
@@ -392,8 +395,57 @@ export function makeToolBox(leds, comm) {
         save: {
             icon: "floppy-disk",
             action: () => {
-                leds.saveToServer("martin", "pokus")
-                //comm.getFileNameCandidates("martin", (data) => console.log(data))
+                const saveDiv = document.getElementById("save")
+                saveDiv.style.display = "block"
+                let folder = comm.getFolderName()
+                const folderInput = document.getElementById("save_folder")
+                folderInput.value = folder
+                const saveNamesDiv = document.getElementById("save_names")
+                saveNamesDiv.innerHTML = "<h1>Choose your save name</h1>"
+                comm.getFileNameCandidates(folder, (data) => {
+                    console.log(data.names)
+                    for(const name of data.names) {
+                        const nameDiv = document.createElement("div")
+                        nameDiv.textContent = name
+                        saveNamesDiv.appendChild(nameDiv)
+                        nameDiv.addEventListener("pointerdown", (ev) => {
+                            leds.saveToServer(folderInput.value, name)
+                            saveDiv.style.display = "none"
+                        })
+                    }
+                })
+                const saveLoadDiv = document.getElementById("save_load")
+                saveLoadDiv.innerHTML = "<h1>Load your save</h1>"
+                comm.loadSaves(folder, (data) => {
+                    console.log(data)
+                    for(const [name, base64Data] of Object.entries(data.saves)) {
+                        const loadDiv = document.createElement("div")
+                        const binString = atob(base64Data);
+                        const state = Uint8Array.from(binString, (m) => m.codePointAt(0))
+                        const thumbnailCanvas = document.createElement('canvas');
+                        thumbnailCanvas.width = THUMB_WIDTH;
+                        thumbnailCanvas.height = THUMB_HEIGHT;
+                        loadDiv.appendChild(thumbnailCanvas);
+                        const ctx = thumbnailCanvas.getContext('2d');
+                        let imageData = ctx.createImageData(THUMB_WIDTH, THUMB_HEIGHT);
+                        for(let i = 0, j = 0; i < state.length; i += 3, j += 4) {
+                            imageData.data[j]     = state[i];     // Red
+                            imageData.data[j + 1] = state[i + 1]; // Green
+                            imageData.data[j + 2] = state[i + 2]; // Blue
+                            imageData.data[j + 3] = 255;          // Alpha (fully opaque)
+                        }
+                        ctx.putImageData(imageData, 0, 0);
+                        const namePar = document.createElement("p")
+                        namePar.textContent = name.substring(name.indexOf("\\") + 1)
+                        loadDiv.appendChild(namePar)
+                        saveLoadDiv.appendChild(loadDiv)
+                        loadDiv.addEventListener("pointerdown", (ev) => {
+                            leds.loadFromState(state)
+                            saveDiv.style.display = "none"
+                            requestAnimationFrame(leds.paintCanvas)
+                        })
+                    }
+                })
             },
             div: null,
             help: "Save the current state to server"

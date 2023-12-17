@@ -1,21 +1,21 @@
 /*
 TODO:
 
-[.] Brush tool -- add respect selection
+[x] Brush tool -- add respect selection
 [x] Pan/move tool -- move the whole pattern along the chain (or only just selection?)
-[ ] Select tool
+[x] Select tool
 [x] Eye dropper tool
-[ ] Gradient
+[x] Gradient
 [x] Globally adjust saturation, lightness
 [-] Preview mode for global adjustment
-[ ] Other chain display configurations
+[x] Other chain display configurations
 [ ] Timeline and Keyframes
 [x] Undo/Redo
-[.] Communication with server
-[ ] Allow disabling live server connection
+[x] Communication with server
+[x] Allow disabling live server connection
 [x] Split toolbox and toolbar
-[ ] Saving selections
-[.] Save/load in general -- on server? Locally?
+[x] Saving selections
+[x] Save/load in general -- on server? Locally?
 [.] More responsive design
 [x] Toolbox & toolbar position: sticky
 */
@@ -550,6 +550,13 @@ function makeLedManager(canvas) {
         return btoa(binString)
     }
 
+    manager.loadFromState = function(state) {
+        saveUndoRedo()
+        loadState(state)
+        _currentState = saveState()
+        comm.transmitState(_currentState)
+    }
+
     manager.saveToServer = function (folder, file_name) {
         const state = saveState()
         comm.saveToServer(folder, file_name, state)
@@ -570,6 +577,7 @@ function makeLedManager(canvas) {
 
 function makeCommunicator() {
     const UPDATE_INTERVAL = 250 //ms
+    let folderName = ""
 
     function saveLocally() {
         console.log("saving locally")
@@ -594,6 +602,9 @@ function makeCommunicator() {
                 break
             case "names":
                 msg = "/save?get_names&folder=" +folder
+                break
+            case "load":
+                msg = "/save?load&folder=" +folder
                 break
             default:
                 console.log("Unknown action " + action)
@@ -625,6 +636,10 @@ function makeCommunicator() {
 
     function loadLocally() {
         console.log("Attempting to read state from local storage")
+        const sFolder = localStorage.getItem("folder")
+        if(sFolder !== "undefined") {
+            folderName = sFolder
+        }
         const binString = localStorage.getItem("state")
         if(binString) {
             console.log("State found in local storage")
@@ -658,7 +673,10 @@ function makeCommunicator() {
         loadLocalState: () => { return loadLocally() },
         setLiveConnection: (value) => { isLive = value },
         saveToServer: (folder, fileName, state) => { sendToServer({ action:'save', folder, fileName, state }) },
-        getFileNameCandidates: (folder, callback) => { sendToServer({ action: 'names', folder, callback }) }
+        getFileNameCandidates: (folder, callback) => { sendToServer({ action: 'names', folder, callback }) },
+        getFolderName: () => { return folderName },
+        setFolderName: (s) => { folderName = s; localStorage.setItem("folder", s); console.log(s) },
+        loadSaves: (folder, callback) => { sendToServer({ action: "load", folder, callback }) }
     }
     return comm
 }
@@ -668,6 +686,9 @@ const ledsManger = makeLedManager(document.getElementById("treeCanvas"))
 
 function start() {
     const toolbox = makeToolBox(ledsManger, comm)
+    document.getElementById("save_folder").addEventListener("change", (ev) => {
+        comm.setFolderName(ev.target.value)
+    }) 
     //ledsManger.positionLEDs('LINE_L2R')
     ledsManger.positionLEDs('LINE_WRAP')
     ledsManger.paintCanvas()
