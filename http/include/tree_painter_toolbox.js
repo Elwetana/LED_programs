@@ -168,7 +168,7 @@ export function makeToolBox(leds, comm) {
             icon: "menu",
             startTool: () => {}, //all functionality is in toolbar buttons
             endTool: () => {},
-            toolbar: ["liveConnection", "ledPlacement", "ledSize", "showHelp"],
+            toolbar: ["save", "liveConnection", "ledPlacement", "ledSize", "showHelp"],
             div: null,
             help: "Opens the system menu"
         }
@@ -388,6 +388,15 @@ export function makeToolBox(leds, comm) {
             div: null,
             help: "Select between two LED configurations: alternating left to right and right to left (default) and " +
                 "text-like (all lines are left to right)"
+        },
+        save: {
+            icon: "floppy-disk",
+            action: () => {
+                leds.saveToServer("martin", "pokus")
+                //comm.getFileNameCandidates("martin", (data) => console.log(data))
+            },
+            div: null,
+            help: "Save the current state to server"
         },
         ledSize: {
             icon: "led-size",

@@ -1,5 +1,6 @@
 #!/usr/bin/python
 import base64
+import random
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import socket
 import argparse
@@ -18,80 +19,179 @@ logger = logging.getLogger(__name__)
 
 
 class LEDHttpHandler(BaseHTTPRequestHandler):
+
+    save_names = {"Sunshine": "nature", "Mountain": "nature", "Ocean": "nature", "Butterfly": "nature", "Rainbow": "nature", "Garden": "nature", "Stream": "nature", "Bird": "nature", "Breeze": "nature", "Orchard": "nature", "Star": "nature", "Meadow": "nature", "Forest": "nature", "Beach": "nature", "Valley": "nature", "Flower": "nature", "Hill": "nature", "Glacier": "nature", "Waterfall": "nature", "River": "nature", "Balloon": "object", "Sunrise": "nature", "Sunset": "nature", "Fountain": "object", "Park": "nature", "Raindrop": "nature", "Rainforest": "nature", "Puppy": "animal", "Kitten": "animal", "Book": "object", "Bridge": "object", "Fireplace": "object", "Lighthouse": "object", "Sandbox": "object", "VanGogh": "painter", "Rembrandt": "painter", "DaVinci": "painter", "Michelangelo": "painter", "Picasso": "painter", "Monet": "painter", "Dali": "painter", "Cezanne": "painter", "Raphael": "painter", "Titian": "painter", "Caravaggio": "painter", "Vermeer": "painter", "Hokusai": "painter", "Goya": "painter", "Turner": "painter", "Constable": "painter", "Rodin": "painter", "Klimt": "painter", "Manet": "painter", "Matisse": "painter", "Renoir": "painter", "Degas": "painter", "Botticelli": "painter", "Bruegel": "painter", "ElGreco": "painter", "Gauguin": "painter", "Magritte": "painter", "Pillow": "object", "Cushion": "object", "Blanket": "object", "Quilt": "object", "Mug": "object", "Sweater": "object", "Scarf": "object", "Firework": "object", "Lantern": "object", "Candle": "object", "Gift": "object", "Snowflake": "nature", "Reindeer": "animal", "Sleigh": "object", "Ornament": "object", "Mistletoe": "nature", "Gingerbread": "food", "Chocolate": "food", "Eggnog": "food", "Bell": "object", "Carols": "music", "Snowman": "nature", "Ice": "nature", "Ski": "object", "Snowboard": "object", "Pinecone": "nature", "Holly": "nature", "Tinsel": "object", "Cherry": "fruit", "Strawberry": "fruit", "Apple": "fruit", "Pear": "fruit", "Peach": "fruit", "Banana": "fruit", "Blueberry": "fruit", "Raspberry": "fruit", "Blackberry": "fruit", "Pineapple": "fruit", "Coconut": "fruit", "Lemon": "fruit", "Orange": "fruit", "Melon": "fruit", "Apricot": "fruit", "Fig": "fruit", "Plum": "fruit", "Guitar": "music", "Piano": "music", "Violin": "music", "Flute": "music", "Saxophone": "music", "Trumpet": "music", "Lion": "animal", "Giraffe": "animal"}
+
+    def split_arguments(self):
+        result = {}
+        parts = self.path.split("?")
+        if len(parts) > 2:
+            self.log_error("Invalid path %s" % self.path)
+        result["base"] = parts[0]
+        if len(parts) == 2:
+            query_parts = parts[1].split("&")
+            for query in query_parts:
+                query_argument = query.split("=")
+                if len(query_argument) > 2:
+                    self.log_error("Invalid URL argument: %s" % query)
+                if len(query_argument) == 2:
+                    result[query_argument[0]] = query_argument[1]
+                else:
+                    result[query_argument[0]] = None
+        return result
+
+    def serve_index(self):
+        f = open('http/index.html', 'r', encoding="utf-8")
+        s = f.read()
+        if sys.platform == "linux":
+            systeminfo = LEDHttpHandler.get_sys_info()
+            # print(systeminfo)
+            s = s.replace("{{systeminfo}}", systeminfo)
+        s = s.replace("{{state}}", json.dumps(self.server.state))
+        self.wfile.write(s.encode())
+
+    def change_source(self):
+        payload = (self.path[len("/source/"):]).upper()
+        msg = "LED SOURCE %s" % payload
+        self.server.broadcaster.send_string(msg)
+        logger.info("ZMQ message sent: %s" % msg)
+        self.wfile.write('{"result":"ok"}'.encode())
+        source_args = payload.split("?")
+        self.server.state["source"] = source_args[0].lower()
+        if len(source_args) > 1:
+            self.server.state["color"] = "#" + source_args[1]
+
+    def send_message(self):
+        payload = self.path[len("/msg/"):]
+        msg = "LED MSG %s" % payload
+        self.server.broadcaster.send_string(msg)
+        logger.info("ZMQ message sent: %s" % msg)
+        self.wfile.write('{"result":"ok"}'.encode())
+        if payload[0:5] == "mode?":
+            self.server.state["mode"] = payload[5:]
+
+    def serve_config(self):
+        if "?" not in self.path:
+            d = self.get_config()
+            d["result"] = "ok"
+            s = json.dumps(d)
+            self.wfile.write(s.encode())
+        else:
+            d = self.save_config(self.path[8:])
+            s = json.dumps(d)
+            if "result" in d and d["result"] == "ok":
+                self.server.broadcaster.send_string("LED RELOAD COLOR")
+                logger.info("ZMQ message sent: LED RELOAD COLOR")
+            self.wfile.write(s.encode())
+
+    def serve_file(self, is_binary):
+        file_name = "http%s" % self.path
+        if os.path.exists(file_name):
+            if is_binary:
+                f = open(file_name, 'rb')
+                self.wfile.write(f.read())
+            else:
+                f = open(file_name, 'r', encoding="utf-8")
+                self.wfile.write(f.read().encode())
+        else:
+            self.wfile.write("FILE NOT FOUND".encode())
+            logger.warning("File not found: %s" % file_name)
+
+    def get_save_names(self, folder_name, n):
+        """
+        Tries to get n name candidates, excluding the names already used
+        Tries to balance the names from different categories
+        :param save_folder:
+        :param n:
+        :return:
+        """
+        names = LEDHttpHandler.save_names.copy()
+        save_folder = "saves/%s" % folder_name
+        if os.path.exists(save_folder) and os.path.isdir(save_folder):
+            all_stuff = os.listdir(save_folder)
+            for stuff in all_stuff:
+                if os.path.isfile(stuff):
+                    name, ext = os.path.splitext(stuff)
+                    if ext == ".png" and name in names:
+                        del names[name]
+        categories = {}
+        for name, category in names.items():
+            if category not in categories:
+                categories[category] = []
+            categories[category].append(name)
+        while True:
+            max_names = 0
+            max_category = 0
+            total = 0
+            for category, names in categories.items():
+                total += len(names)
+                if len(names) > max_names:
+                    max_category = category
+                    max_names = len(names)
+            if total <= n:
+                break
+            del categories[max_category][random.randrange(max_names)]
+        result = []
+        [result.extend(x) for x in categories.values()]
+        self.wfile.write(json.dumps({"result": "ok", "names": result}).encode())
+
+    def save_state(self, folder, save_name, state):
+        save_folder = "saves/%s" % folder
+        if not os.path.exists(save_folder) or not os.path.isdir(save_folder):
+            if os.path.exists(save_folder) and not os.path.isdir(save_folder):
+                os.remove(save_folder)
+            os.mkdir(save_folder)
+        LEDHttpHandler.save_state_as_png(state, os.path.join(save_folder, save_name + ".png"))
+        self.wfile.write('{"result":"ok"}'.encode())
+
+    def serve_save(self):
+        """
+        Valid inputs:
+        ?get_names&folder=<folder> -> get save names for folder
+        ?save_as&folder=<folder>&name=<name>&state=<base64encoded state>
+        ?load&folder=<folder>
+        :return:
+        """
+        qq = self.split_arguments()
+        if "get_names" in qq:
+            self.get_save_names(qq["folder"], 9)
+        elif "save_as" in qq:
+            self.save_state(qq["folder"], qq["name"], qq["state"])
+        else:
+            self.wfile.write(('{"result":"error", "reason":"Unknown save command %s"}' % self.path).encode())
+
     def do_GET(self):
+        # Send headers
         self.send_response(200)
-        isBinary = False
+        is_binary = False
         if len(self.path) > 3 and self.path[-2:] == 'js':
             self.send_header("Content-Type", "text/javascript; charset=UTF-8")
         elif len(self.path) > 4 and self.path[-3:] == 'svg':
             self.send_header("Content-Type", "image/svg+xml")
         elif len(self.path) > 4 and self.path[-3:] == 'png':
             self.send_header("Content-Type", "image/png")
-            isBinary = True
+            is_binary = True
         else:
             self.send_header("Content-Type", "text/html; charset=UTF-8")
         self.end_headers()
+
+        # Serve requests
         if self.path == "/favicon.ico":
             f = open("http/favicon.ico", 'rb')
             self.wfile.write(f.read())
-            return
-        if self.path == "/":
-            f = open('http/index.html', 'r', encoding="utf-8")
-            s = f.read()
-            if sys.platform == "linux":
-                systeminfo = LEDHttpHandler.get_sys_info()
-                # print(systeminfo)
-                s = s.replace("{{systeminfo}}", systeminfo)
-            s = s.replace("{{state}}", json.dumps(self.server.state))
-            self.wfile.write(s.encode())
-            return
-        if self.path[0:7] == "/source":
-            payload = (self.path[len("/source/"):]).upper()
-            msg = "LED SOURCE %s" % payload
-            self.server.broadcaster.send_string(msg)
-            logger.info("ZMQ message sent: %s" % msg)
-            self.wfile.write('{"result":"ok"}'.encode())
-            l = payload.split("?")
-            self.server.state["source"] = l[0].lower()
-            if len(l) > 1:
-                self.server.state["color"] = "#" + l[1]
-            return
-        if self.path[0:4] == "/msg":
-            payload = self.path[len("/msg/"):]
-            msg = "LED MSG %s" % payload
-            self.server.broadcaster.send_string(msg)
-            logger.info("ZMQ message sent: %s" % msg)
-            self.wfile.write('{"result":"ok"}'.encode())
-            if payload[0:5] == "mode?":
-                self.server.state["mode"] = payload[5:]
-            if payload[0:4] == "set?":
-                self.save_state_as_png(payload[4:])
-            return
-        if self.path[0:7] == "/config":
-            if "?" not in self.path:
-                d = self.get_config()
-                d["result"] = "ok"
-                s = json.dumps(d)
-                self.wfile.write(s.encode())
-            else:
-                d = self.save_config(self.path[8:])
-                s = json.dumps(d)
-                if "result" in d and d["result"] == "ok":
-                    self.server.broadcaster.send_string("LED RELOAD COLOR")
-                    logger.info("ZMQ message sent: LED RELOAD COLOR")
-                self.wfile.write(s.encode())
-            return
-        fname = "http%s" % self.path
-        if os.path.exists(fname):
-            if isBinary:
-                f = open(fname, 'rb')
-                self.wfile.write(f.read())
-            else:
-                f = open(fname, 'r', encoding="utf-8")
-                self.wfile.write(f.read().encode())
+        elif self.path == "/":
+            self.serve_index()
+        elif self.path[0:7] == "/source":
+            self.change_source()
+        elif self.path[0:4] == "/msg":
+            self.send_message()
+        elif self.path[0:7] == "/config":
+            self.serve_config()
+        elif self.path[0:5] == "/save":
+            # self.get_save_names("martin", 9)
+            self.serve_save()
         else:
-            self.wfile.write("FILE NOT FOUND".encode())
-            logger.warning("File not found: %s" % fname)
+            self.serve_file(is_binary)
 
     @staticmethod
     def get_sys_info():
@@ -103,9 +203,11 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
         temp_info = "<tr><td colspan=4>CPU temperature: %s°C</td></tr>\n" % (int(ftemp.readline()) / 1000)
         return "<table>\n" + proc_info + temp_info + "</table>\n"
 
-    def save_state_as_png(self, base64_state):
-        png = pillowImg.new('RGB', (16, 16))
+    @staticmethod
+    def save_state_as_png(base64_state, file_name):
         state = base64.b64decode(base64_state)
+        """
+        png = pillowImg.new('RGB', (16, 16))
         for p in range(len(state) // 3):
             r = state[3*p+0]
             g = state[3*p+1]
@@ -113,8 +215,9 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
             x = p % 16
             y = p // 16
             png.putpixel((x, y), (r, g, b))
-
-        png.save("http/image.png", "PNG")
+        """
+        png = pillowImg.frombytes("RGB", (16, 16), state + bytes(3*56))
+        png.save(file_name, "PNG")
 
     def get_config(self):
         if not os.path.exists(self.server.config_path):
@@ -236,7 +339,7 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
         return {"result": "ok"}
 
 
-class LEDHttpServer():
+class LEDHttpServer:
 
     serverIP = ""
     serverPort = 80
@@ -249,8 +352,7 @@ class LEDHttpServer():
         s.connect(('<broadcast>', 0))
         return s.getsockname()[0]
 
-
-    def __init__(self,args):
+    def __init__(self, args):
         if(args.ip != "default"):
             LEDHttpServer.serverIP = args.ip
         else:

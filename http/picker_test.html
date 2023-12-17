@@ -39,7 +39,30 @@
         }
     </style>
     <script>
+        function testConnection() {
+            const msg = "/save?get_names&name=abc&state=1234546"
+            fetch( msg, {
+                method: 'GET',
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if(data.result !== "ok") {
+                        console.log("Error sending state to sever")
+                        console.log(data)
+                    }
+                    else {
+                        console.log("State sent to server")
+                        console.log(data)
+                    }
+                }).catch((error) => {
+                alert('Error:' + error);
+            });
+
+        }
+
+
         document.addEventListener("DOMContentLoaded", () => {
+            testConnection()
             const logDiv = document.getElementById("log")
             logDiv.innerHTML += "<p>pixel ratio " + window.devicePixelRatio + "</p>"
             logDiv.innerHTML += "<p>Window innerWidth " + window.innerWidth + "</p>"

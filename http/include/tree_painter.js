@@ -550,6 +550,11 @@ function makeLedManager(canvas) {
         return btoa(binString)
     }
 
+    manager.saveToServer = function (folder, file_name) {
+        const state = saveState()
+        comm.saveToServer(folder, file_name, state)
+    }
+
     manager.paintCanvas = () => {
         //const canvas = document.getElementById("treeCanvas")
         const ctx = manager.canvas.getContext("2d");
@@ -571,11 +576,29 @@ function makeCommunicator() {
         localStorage.setItem("state", String.fromCodePoint(...lastState))
     }
 
-    function sendToServer() {
-        if(!isLive)
+    function sendToServer({ action='set', folder='', fileName='', state=null,
+                              callback=()=>{} } = {}) {
+        if(!isLive && action === "set")
             return
+
         // /msg/set?<base64 encoded state>
-        const msg = "/msg/set?" + btoa(String.fromCodePoint(...lastState))
+        // /save?save_as&folder=<folder>&name=<name>&state=<base64encoded state>
+        // /save?get_names&folder=<folder> -> get save names for folder
+        let msg = ""
+        switch (action) {
+            case 'set':
+                msg = "/msg/set?" + btoa(String.fromCodePoint(...lastState))
+                break
+            case "save":
+                msg = "/save?save_as&folder=" + folder + "&name=" + fileName + "&state=" + btoa(String.fromCodePoint(...state))
+                break
+            case "names":
+                msg = "/save?get_names&folder=" +folder
+                break
+            default:
+                console.log("Unknown action " + action)
+                return
+        }
         fetch( msg, {
             method: 'GET',
         })
@@ -586,6 +609,7 @@ function makeCommunicator() {
             }
             else {
                 console.log("State sent to server")
+                callback(data)
             }
         }).catch((error) => {
             alert('Error:' + error);
@@ -633,7 +657,8 @@ function makeCommunicator() {
         },
         loadLocalState: () => { return loadLocally() },
         setLiveConnection: (value) => { isLive = value },
-        getLiveConnection: () => { return isLive }
+        saveToServer: (folder, fileName, state) => { sendToServer({ action:'save', folder, fileName, state }) },
+        getFileNameCandidates: (folder, callback) => { sendToServer({ action: 'names', folder, callback }) }
     }
     return comm
 }
