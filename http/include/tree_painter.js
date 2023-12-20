@@ -595,7 +595,7 @@ function makeCommunicator() {
         let msg = ""
         switch (action) {
             case 'set':
-                msg = "/msg/set?" + btoa(String.fromCodePoint(...lastState))
+                msg = "/msg/paint?state=" + btoa(String.fromCodePoint(...lastState))
                 break
             case "save":
                 msg = "/save?save_as&folder=" + folder + "&name=" + fileName + "&state=" + btoa(String.fromCodePoint(...state))

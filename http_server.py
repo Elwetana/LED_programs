@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 N_LEDS = 200
 N_THUMB_SIZE = 16
 
+
 class LEDHttpHandler(BaseHTTPRequestHandler):
 
     save_names = {"Sunshine": "nature", "Mountain": "nature", "Ocean": "nature", "Butterfly": "nature", "Rainbow": "nature", "Garden": "nature", "Stream": "nature", "Bird": "nature", "Breeze": "nature", "Orchard": "nature", "Star": "nature", "Meadow": "nature", "Forest": "nature", "Beach": "nature", "Valley": "nature", "Flower": "nature", "Hill": "nature", "Glacier": "nature", "Waterfall": "nature", "River": "nature", "Balloon": "object", "Sunrise": "nature", "Sunset": "nature", "Fountain": "object", "Park": "nature", "Raindrop": "nature", "Rainforest": "nature", "Puppy": "animal", "Kitten": "animal", "Book": "object", "Bridge": "object", "Fireplace": "object", "Lighthouse": "object", "Sandbox": "object", "VanGogh": "painter", "Rembrandt": "painter", "DaVinci": "painter", "Michelangelo": "painter", "Picasso": "painter", "Monet": "painter", "Dali": "painter", "Cezanne": "painter", "Raphael": "painter", "Titian": "painter", "Caravaggio": "painter", "Vermeer": "painter", "Hokusai": "painter", "Goya": "painter", "Turner": "painter", "Constable": "painter", "Rodin": "painter", "Klimt": "painter", "Manet": "painter", "Matisse": "painter", "Renoir": "painter", "Degas": "painter", "Botticelli": "painter", "Bruegel": "painter", "ElGreco": "painter", "Gauguin": "painter", "Magritte": "painter", "Pillow": "object", "Cushion": "object", "Blanket": "object", "Quilt": "object", "Mug": "object", "Sweater": "object", "Scarf": "object", "Firework": "object", "Lantern": "object", "Candle": "object", "Gift": "object", "Snowflake": "nature", "Reindeer": "animal", "Sleigh": "object", "Ornament": "object", "Mistletoe": "nature", "Gingerbread": "food", "Chocolate": "food", "Eggnog": "food", "Bell": "object", "Carols": "music", "Snowman": "nature", "Ice": "nature", "Ski": "object", "Snowboard": "object", "Pinecone": "nature", "Holly": "nature", "Tinsel": "object", "Cherry": "fruit", "Strawberry": "fruit", "Apple": "fruit", "Pear": "fruit", "Peach": "fruit", "Banana": "fruit", "Blueberry": "fruit", "Raspberry": "fruit", "Blackberry": "fruit", "Pineapple": "fruit", "Coconut": "fruit", "Lemon": "fruit", "Orange": "fruit", "Melon": "fruit", "Apricot": "fruit", "Fig": "fruit", "Plum": "fruit", "Guitar": "music", "Piano": "music", "Violin": "music", "Flute": "music", "Saxophone": "music", "Trumpet": "music", "Lion": "animal", "Giraffe": "animal"}
@@ -71,6 +72,28 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
         if payload[0:5] == "mode?":
             self.server.state["mode"] = payload[5:]
 
+    def serve_paint(self):
+        qq = self.split_arguments()
+        if "state" not in qq:
+            self.wfile.write('{"result":"error", "error":"State argument is not present"}'.encode())
+            return
+        state: bytes = base64.b64decode(qq["state"])
+        client = self.client_address[0]
+        if client not in self.server.paint_state:
+            self.server.paint_state[client] = bytes(3 * N_LEDS)
+        for led in range(N_LEDS):
+            if state[3 * led] != self.server.paint_state[client][3 * led] or \
+               state[3 * led + 1] != self.server.paint_state[client][3 * led + 1] or \
+               state[3 * led + 2] != self.server.paint_state[client][3 * led + 2]:
+                self.server.paint_state["leds"][3 * led + 0] = state[3 * led + 0]
+                self.server.paint_state["leds"][3 * led + 1] = state[3 * led + 1]
+                self.server.paint_state["leds"][3 * led + 2] = state[3 * led + 2]
+        self.server.paint_state[client] = state
+        msg = "LED MSG set?%s" % base64.b64encode(self.server.paint_state["leds"]).decode(encoding="utf-8")
+        self.server.broadcaster.send_string(msg)
+        logger.info("ZMQ message sent: %s" % msg)
+        self.wfile.write('{"result":"ok"}'.encode())
+
     def serve_config(self):
         if "?" not in self.path:
             d = self.get_config()
@@ -111,7 +134,8 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
         if os.path.exists(save_folder) and os.path.isdir(save_folder):
             all_stuff = os.listdir(save_folder)
             for stuff in all_stuff:
-                if os.path.isfile(stuff):
+                file_name = os.path.join(save_folder, stuff)
+                if os.path.isfile(file_name):
                     name, ext = os.path.splitext(stuff)
                     if ext == ".png" and name in names:
                         del names[name]
@@ -148,17 +172,18 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
     def load_saves(self, folder_name):
         result = {"saves": {}}
         save_folder = "saves/%s" % folder_name
-        print("loading form %s" % save_folder)
         if os.path.exists(save_folder) and os.path.isdir(save_folder):
             all_stuff = os.listdir(save_folder)
-            print(all_stuff)
             for stuff in all_stuff:
                 file_name = os.path.join(save_folder, stuff)
                 if os.path.isfile(file_name):
-                    print("loading %s" % file_name)
                     base64_state = LEDHttpHandler.load_state_from_png(file_name)
                     name, ext = os.path.splitext(file_name)
                     result["saves"][name] = base64_state
+        result["folders"] = []
+        for stuff in os.listdir("saves/"):
+            if os.path.isdir(os.path.join("saves/", stuff)):
+                result["folders"].append(stuff)
         result["result"] = "ok"
         self.wfile.write(json.dumps(result).encode())
 
@@ -208,8 +233,9 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
         elif self.path[0:7] == "/config":
             self.serve_config()
         elif self.path[0:5] == "/save":
-            # self.get_save_names("martin", 9)
             self.serve_save()
+        elif self.path[0:6] == "/paint":
+            self.serve_paint()
         else:
             self.serve_file(is_binary)
 
@@ -371,7 +397,7 @@ class LEDHttpServer:
         return s.getsockname()[0]
 
     def __init__(self, args):
-        if(args.ip != "default"):
+        if args.ip != "default":
             LEDHttpServer.serverIP = args.ip
         else:
             LEDHttpServer.serverIP = self.get_IP_address()
@@ -386,6 +412,7 @@ class LEDHttpServer:
         self.server.broadcaster = context.socket(zmq.PUB)
         self.server.broadcaster.bind(LEDHttpServer.zmqPort)
         self.server.state = {"source": "embers", "color": "#FFFFFF", "mode": ""}
+        self.server.paint_state = {"leds": bytearray(3 * N_LEDS)}
         
         try:
             while True:
