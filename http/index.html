@@ -60,6 +60,7 @@
                 ], controls: "game_controls" },
             { id: "rad_game", label: "Rhythm & Dance", modes: [], controls: "game_controls" },
             { id: "m3_game", label: "Bezumed", modes: [], controls: "game_controls" },
+            { id: "paint", label: "LED Painter", modes: [], controls: "paint_controls" },
             { id: "off", label: "Off", modes: [] }
         ]
 
@@ -436,6 +437,9 @@
         <input type="text" id="game_mode_input" value="">
         <button id="game_button" onclick="SendMessage()">Send message</button>
         <p><a href="game2022.html" target="_blank">Please read this</a></p>
+    </div>
+    <div id="paint_controls">
+        <p><a href="game2023.html" target="_blank">Open the editor</a></p>
     </div>
     <div id="systeminfo">
         {{systeminfo}}

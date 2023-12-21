@@ -326,7 +326,7 @@ export function makeToolBox(leds, comm) {
             value: true,
             action: makeStateHolderAction ("useWrap", true),
             div: null,
-            help: "When active, the LEDs will wrapped along when moving"
+            help: "When active, the LEDs will be wrapped along when moving"
         },
         useSelection: {
             icon: "select",

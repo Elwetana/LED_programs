@@ -7,9 +7,10 @@ TODO:
 [x] Eye dropper tool
 [x] Gradient
 [x] Globally adjust saturation, lightness
-[-] Preview mode for global adjustment
+[x] Preview mode for global adjustment
 [x] Other chain display configurations
-[ ] Timeline and Keyframes
+[-] Timeline and Keyframes
+[ ] Animation modes
 [x] Undo/Redo
 [x] Communication with server
 [x] Allow disabling live server connection
@@ -18,6 +19,13 @@ TODO:
 [x] Save/load in general -- on server? Locally?
 [.] More responsive design
 [x] Toolbox & toolbar position: sticky
+[ ] Allow upload of 16 x 16 PNG images
+[ ] Multiplayer -- selective update of only changed data -- on server
+Bugs:
+[ ] warn when folder name not filled in
+[ ] move thumbnail making code to ledManager
+[ ] split ledManager and communicator to separate modules
+[ ] undo should transmit state
 */
 
 import './iro.min.js'
