@@ -98,6 +98,21 @@ export function makeHSL(h, s, l) {
         hsl.l = clamp(hsl.l + amount, 0, 100)
     }
 
+    hsl.dotProduct = (other) => {
+        let h = other.h
+        if((hsl.h - h) > 180) {
+            h += 360
+        }
+        else if((hsl.h - h) < -180) {
+            h -= 360
+        }
+        const l1 = Math.sqrt(hsl.h * hsl.h + hsl.s * hsl.s + hsl.l * hsl.l)
+        if(l1 === 0) return  0;
+        const l2 = Math.sqrt(h * h + other.s * other.s + other.l * other.l)
+        if(l2 === 0) return 0
+        return (hsl.h * h + hsl.s * other.s + hsl.l * other.l) / l1 / l2
+    }
+
     function clamp(num, min, max) {
         return Math.min(Math.max(num, min), max);
     }

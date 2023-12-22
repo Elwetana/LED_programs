@@ -88,11 +88,12 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
                 self.server.paint_state["leds"][3 * led + 0] = state[3 * led + 0]
                 self.server.paint_state["leds"][3 * led + 1] = state[3 * led + 1]
                 self.server.paint_state["leds"][3 * led + 2] = state[3 * led + 2]
-        self.server.paint_state[client] = state
-        msg = "LED MSG set?%s" % base64.b64encode(self.server.paint_state["leds"]).decode(encoding="utf-8")
+        self.server.paint_state[client] = bytes(self.server.paint_state["leds"])
+        base64_state = base64.b64encode(self.server.paint_state["leds"]).decode(encoding="utf-8")
+        msg = "LED MSG set?%s" % base64_state
         self.server.broadcaster.send_string(msg)
         logger.info("ZMQ message sent: %s" % msg)
-        self.wfile.write('{"result":"ok"}'.encode())
+        self.wfile.write(json.dumps({"result": "ok", "state": base64_state}).encode())
 
     def serve_config(self):
         if "?" not in self.path:

@@ -292,6 +292,11 @@ function makeLedManager(canvas) {
         }
     }
 
+    function transmitState() {
+        _currentState = saveState()
+        comm.transmitState(_currentState)
+    }
+
     manager.init = function() {
         for(let l = 0; l < N_LEDS; l++) {
             _leds.push(makeLED(l))
@@ -401,8 +406,7 @@ function makeLedManager(canvas) {
         if(index > -1 && !_leds[index].sameColour(colour) && (!selectedOnly || _leds[i].selected)) {
             saveUndoRedo()
             _leds[index].setColour(colour)
-            _currentState = saveState()
-            comm.transmitState(_currentState)
+            transmitState()
         }
     }
 
@@ -549,8 +553,7 @@ function makeLedManager(canvas) {
     manager.applyState = function () {
         _weakSave = null
         saveUndoRedo()
-        _currentState = saveState()
-        comm.transmitState(_currentState)
+        transmitState()
     }
 
     manager.getStateBase64 = () => {
@@ -561,8 +564,11 @@ function makeLedManager(canvas) {
     manager.loadFromState = function(state) {
         saveUndoRedo()
         loadState(state)
-        _currentState = saveState()
-        comm.transmitState(_currentState)
+        transmitState()
+    }
+
+    manager.setFromState = function (state) {
+        loadState(state)
     }
 
     manager.saveToServer = function (folder, file_name) {
@@ -580,6 +586,14 @@ function makeLedManager(canvas) {
         }
     }
 
+    manager.setAnimation = function (mode, speed) {
+        comm.setAnimation(mode, speed)
+    }
+
+    manager.n_leds = function ()  {
+        return N_LEDS
+    }
+
     return manager
 }
 
@@ -593,7 +607,7 @@ function makeCommunicator() {
     }
 
     function sendToServer({ action='set', folder='', fileName='', state=null,
-                              callback=()=>{} } = {}) {
+                            mode=0, speed=0, callback=()=>{} } = {}) {
         if(!isLive && action === "set")
             return
 
@@ -603,7 +617,7 @@ function makeCommunicator() {
         let msg = ""
         switch (action) {
             case 'set':
-                msg = "/msg/paint?state=" + btoa(String.fromCodePoint(...lastState))
+                msg = "/paint?state=" + btoa(String.fromCodePoint(...lastState))
                 break
             case "save":
                 msg = "/save?save_as&folder=" + folder + "&name=" + fileName + "&state=" + btoa(String.fromCodePoint(...state))
@@ -613,6 +627,9 @@ function makeCommunicator() {
                 break
             case "load":
                 msg = "/save?load&folder=" +folder
+                break
+            case "anim":
+                msg = "/msg/anim?" + mode + "=" + speed
                 break
             default:
                 console.log("Unknown action " + action)
@@ -637,7 +654,13 @@ function makeCommunicator() {
 
     function saveState() {
         saveLocally()
-        sendToServer()
+        sendToServer({callback: (data) => {
+            if(data.hasOwnProperty("state")) {
+                const binString = atob(data.state);
+                ledsManger.setFromState(Uint8Array.from(binString, (m) => m.codePointAt(0)))
+                requestAnimationFrame(ledsManger.paintCanvas)
+            }
+        }})
         updateQueued = false
         lastUpdate = Date.now()
     }
@@ -684,7 +707,8 @@ function makeCommunicator() {
         getFileNameCandidates: (folder, callback) => { sendToServer({ action: 'names', folder, callback }) },
         getFolderName: () => { return folderName },
         setFolderName: (s) => { folderName = s; localStorage.setItem("folder", s); console.log(s) },
-        loadSaves: (folder, callback) => { sendToServer({ action: "load", folder, callback }) }
+        loadSaves: (folder, callback) => { sendToServer({ action: "load", folder, callback }) },
+        setAnimation: (mode, speed) => { sendToServer({action: "anim", mode, speed}) }
     }
     return comm
 }

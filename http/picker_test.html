@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <title>colour picker test</title>
-    <!-- script type="module" src="include/tree_painter_colour_picker.js"></script>
+    <script type="module" src="include/tree_painter_colour_picker.js"></script>
     <script type="module">
         document.addEventListener("DOMContentLoaded", start)
         import {makeColourPicker} from "./include/tree_painter_colour_picker.js"
@@ -16,8 +16,41 @@
 
             const p = makeColourPicker(1, makeHSL(0, 100, 50), pickerDiv)
             p.init()
-            p.closeHandler = () => {
+            p.onClose = () => {
                 console.log("closing picker")
+            }
+            p.onChange = (v) => {
+                //Y = 50, R = 0, G = 120, B = 240
+                const nn = ["R", "Y", "G", "B"]
+                const rygb = [makeHSL(0, 100, 50), makeHSL(50, 100, 50), makeHSL(120, 100, 50), makeHSL(240, 100, 50)]
+                let iFrom = rygb.reduce((acc, c, i) => { return (c.h < v.h) ? i : acc}, 3)
+                let iTo = (iFrom + 1) % 4
+                let interval = rygb[iTo].h - rygb[iFrom].h
+                if(interval < 0) interval += 360
+                let dist = (v.h - rygb[iFrom].h) / interval
+
+                const closest = dist < 0.5 ? iFrom : iTo
+                if(dist > 0.5) dist = 1 - dist
+                console.log(v, nn[closest], dist)
+/*
+                let h = other.h
+                if((hsl.h - h) > 180) {
+                    h += 360
+                }
+                else if((hsl.h - h) < -180) {
+                    h -= 360
+                }
+                return Math.abs(hsl.h - h)
+
+
+
+
+                const angles = yrgb.map((c) => c.dotProduct(v))
+                const min = angles.reduce((acc, a, i) => { return a < acc[0] ? [a, i] : acc }, [360, -1])
+
+                console.log(angles)
+                console.log(min)
+                console.log(["R", "Y", "G", "B"][min[1]] + ": " + min[0])*/
             }
         }
     </script>
@@ -28,8 +61,8 @@
         #picker .pickerSlider {
             padding: 5px;
         }
-    </style-->
-    <style>
+    </style>
+    <!-- style>
         div#picker {
             width: 95vw;
             height: 100px;
@@ -62,17 +95,17 @@
 
 
         document.addEventListener("DOMContentLoaded", () => {
-            testConnection()
+            //testConnection()
             const logDiv = document.getElementById("log")
             logDiv.innerHTML += "<p>pixel ratio " + window.devicePixelRatio + "</p>"
             logDiv.innerHTML += "<p>Window innerWidth " + window.innerWidth + "</p>"
             logDiv.innerHTML += "<p>Viewport width " + window.visualViewport.width + "</p>"
             logDiv.innerHTML += "<p>Viewport scale " + window.visualViewport.scale + "</p>"
         })
-    </script>
+    </script -->
 </head>
 <body>
-
+    <div id="tools" style="width: 350px;"></div>
     <div id="picker">
         TEST
     </div>

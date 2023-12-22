@@ -167,6 +167,14 @@ export function makeToolBox(leds, comm) {
             div: null,
             help: "Allows globally adjust hue, saturation and lightness of all LEDs (or only of the selected ones)"
         },
+        animation: {
+            icon: "anim",
+            startTool: () => {},
+            endTool: () => {},
+            toolbar: ["noAnim", "moveAnim", "aaMoveAnim", "shimmerAnim", "moveShimmerAnim"],
+            div: null,
+            help: "Opens menu where you can select global animation mode and speed"
+        },
         menu: {
             icon: "menu",
             startTool: () => {}, //all functionality is in toolbar buttons
@@ -257,6 +265,39 @@ export function makeToolBox(leds, comm) {
             setTimeout(() => {
                 toolbar[toolbarItem].div.style.backgroundImage = 'url("include/' + toolbar[toolbarItem].icon + '-line.svg")'
             }, 100)
+        }
+    }
+
+    function makeAnimAction(animationName) {
+        const animationId = {noAnim: 0, moveAnim: 1, aaMoveAnim: 2, shimmerAnim: 3, moveShimmerAnim: 4}[animationName]
+        return () => {
+            const min = -10
+            const max = +10
+            const toolbarDiv = toolbar.noAnim.div.parentElement
+            toolbarDiv.innerHTML = ''
+            const input = document.createElement("input")
+            input.type = "range"
+            input.min = min.toString()
+            input.max = max.toString()
+            input.value = toolbar[animationName].speed.toString()
+            input.classList.add("tool_item5")
+            toolbarDiv.appendChild(input)
+            leds.setAnimation(animationId, toolbar[animationName].speed)
+            input.addEventListener("input", (ev) => {
+                const speed = -1 * ev.target.value
+                leds.setAnimation(animationId, speed)
+                toolbar[animationName].speed = speed
+            })
+
+            //TODO reuse with makeShiftAction
+            const closeDiv = document.createElement("div")
+            closeDiv.classList.add("tool_item")
+            closeDiv.style.backgroundImage = 'url("include/capital-X-line.svg")'
+            toolbarDiv.appendChild(closeDiv)
+            closeDiv.addEventListener("pointerdown", (ev) => {
+                ev.stopPropagation()
+                createToolbarForCurrentTool()
+            })
         }
     }
 
@@ -378,6 +419,41 @@ export function makeToolBox(leds, comm) {
             div: null,
             help: "Switches between adding to and removing from the selection"
         },
+        noAnim: {
+            icon: "anim-none",
+            speed: 0,
+            action: makeAnimAction("noAnim"),
+            div: null,
+            help: "Stops running animations, everything is rendered statically"
+        },
+        moveAnim: {
+            icon: "anim-move-no-aa",
+            speed: 1,
+            action: makeAnimAction("moveAnim"),
+            div: null,
+            help: "Pattern moves along the chain with a given speed, there is no antialiasing (i.e. leds 'jump' from place to place)"
+        },
+        aaMoveAnim: {
+            icon: "anim-move-aa",
+            speed: 1,
+            action: makeAnimAction("aaMoveAnim"),
+            div: null,
+            help: "Pattern moves along the chain with a given speed by blending (i.e. leds 'flows' from place to place)"
+        },
+        shimmerAnim: {
+            icon: "anim-shimmer",
+            speed: 1,
+            action: makeAnimAction("shimmerAnim"),
+            div: null,
+            help: "LEDs in the pattern randomly change their lightness and saturation"
+        },
+        moveShimmerAnim: {
+            icon: "anim-move-shimmer",
+            speed: 1,
+            action: makeAnimAction("moveShimmerAnim"),
+            div: null,
+            help: "Combination of the two preceding modes"
+        },
         ledPlacement: {
             icon: "led-position",
             value: false,
@@ -395,6 +471,7 @@ export function makeToolBox(leds, comm) {
         save: {
             icon: "floppy-disk",
             action: () => {
+                //TODO refactor to resemble something human
                 const saveDiv = document.getElementById("save")
                 saveDiv.style.display = "block"
                 let folder = comm.getFolderName()
@@ -417,7 +494,7 @@ export function makeToolBox(leds, comm) {
                 const saveLoadDiv = document.getElementById("save_load")
                 saveLoadDiv.innerHTML = "<h1>Load your save</h1>"
                 comm.loadSaves(folder, (data) => {
-                    console.log(data)
+                    //console.log(data)
                     for(const [name, base64Data] of Object.entries(data.saves)) {
                         const loadDiv = document.createElement("div")
                         const binString = atob(base64Data);
@@ -445,6 +522,14 @@ export function makeToolBox(leds, comm) {
                             requestAnimationFrame(leds.paintCanvas)
                         })
                     }
+                })
+                const saveNewDiv = document.getElementById("save_new")
+                saveNewDiv.innerHTML = "<h1>Clear all and start from scratch</h1>"
+                saveNewDiv.getElementsByTagName("h1")[0].addEventListener("pointerdown", (ev) => {
+                    const state = new Uint8Array(3 * leds.n_leds())
+                    leds.loadFromState(state)
+                    saveDiv.style.display = "none"
+                    requestAnimationFrame(leds.paintCanvas)
                 })
             },
             div: null,
