@@ -22,11 +22,11 @@ TODO:
 [ ] Allow upload of 16 x 16 PNG images
 [x] Multiplayer -- selective update of only changed data -- on server
 Bugs:
-[ ] warn when folder name not filled in
+[x] warn when folder name not filled in
 [ ] move thumbnail making code to ledManager
 [ ] split ledManager and communicator to separate modules
 [ ] undo should transmit state
-[ ] allow load from other folders
+[x] allow load from other folders
 */
 
 import './iro.min.js'
@@ -642,14 +642,14 @@ function makeCommunicator() {
         .then(response => response.json())
         .then(data => {
             if(data.result !== "ok") {
-                alert("Error sending state to sever")
+                console.log("Error sending state to sever")
             }
             else {
                 console.log("State sent to server")
                 callback(data)
             }
         }).catch((error) => {
-            alert('Error:' + error);
+            console.log('Error:' + error);
         });
     }
 

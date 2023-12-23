@@ -470,32 +470,37 @@ export function makeToolBox(leds, comm) {
         },
         save: {
             icon: "floppy-disk",
-            action: () => {
-                //TODO refactor to resemble something human
-                const saveDiv = document.getElementById("save")
-                saveDiv.style.display = "block"
-                let folder = comm.getFolderName()
-                const folderInput = document.getElementById("save_folder")
-                folderInput.value = folder
-                const saveNamesDiv = document.getElementById("save_names")
-                saveNamesDiv.innerHTML = "<h1>Choose your save name</h1>"
-                comm.getFileNameCandidates(folder, (data) => {
-                    console.log(data.names)
-                    for(const name of data.names) {
-                        const nameDiv = document.createElement("div")
-                        nameDiv.textContent = name
-                        saveNamesDiv.appendChild(nameDiv)
-                        nameDiv.addEventListener("pointerdown", (ev) => {
-                            leds.saveToServer(folderInput.value, name)
-                            saveDiv.style.display = "none"
-                        })
-                    }
+            is_init: false,
+            init_permanent_listeners: () => {
+                if(toolbar.save.is_init)
+                    return
+                toolbar.save.is_init = true
+
+                //Click new to clear canvas
+                document.getElementById("save_new").addEventListener("pointerdown", (ev) => {
+                    const state = new Uint8Array(3 * leds.n_leds())
+                    leds.loadFromState(state)
+                    document.getElementById("save").style.display = "none"
+                    requestAnimationFrame(leds.paintCanvas)
                 })
-                const saveLoadDiv = document.getElementById("save_load")
-                saveLoadDiv.innerHTML = "<h1>Load your save</h1>"
-                comm.loadSaves(folder, (data) => {
-                    //console.log(data)
-                    for(const [name, base64Data] of Object.entries(data.saves)) {
+                //Click close to do nothing
+                document.getElementById("save_close").addEventListener("pointerdown", (ev) => {
+                    document.getElementById("save").style.display = "none"
+                    requestAnimationFrame(leds.paintCanvas)
+                })
+
+            },
+            action: () => {
+                toolbar.save.init_permanent_listeners()
+
+                //TODO refactor to resemble something human
+
+                /**
+                 * @param {HTMLElement} saveLoadDiv
+                 * @param {Record<string, string>}saves
+                 */
+                function showSaves(saveLoadDiv, saves) {
+                    for(const [name, base64Data] of Object.entries(saves)) {
                         const loadDiv = document.createElement("div")
                         const binString = atob(base64Data);
                         const state = Uint8Array.from(binString, (m) => m.codePointAt(0))
@@ -522,15 +527,52 @@ export function makeToolBox(leds, comm) {
                             requestAnimationFrame(leds.paintCanvas)
                         })
                     }
+                }
+
+                function fetchSaves(folder) {
+                    comm.loadSaves(folder, (data) => {
+                        const saveLoadDiv = document.getElementById("save_load")
+                        saveLoadDiv.innerHTML = "<h1>Load your save</h1>"
+                        showSaves(saveLoadDiv, data.saves)
+                        //console.log(data)
+                        const savefoldersDiv = document.getElementById("save_folders")
+                        savefoldersDiv.innerHTML = '<h1>Choose another folder</h1>'
+                        for(const otherFolder of data.folders) {
+                            const folderDiv = document.createElement("div")
+                            folderDiv.textContent = otherFolder
+                            savefoldersDiv.appendChild(folderDiv)
+                            folderDiv.addEventListener("pointerdown", (ev) => {
+                                fetchSaves(otherFolder)
+                            })
+                        }
+                    })
+                }
+
+                const saveDiv = document.getElementById("save")
+                saveDiv.style.display = "block"
+                let folder = comm.getFolderName()
+                const folderInput = document.getElementById("save_folder")
+                folderInput.value = folder
+                const saveNamesDiv = document.getElementById("save_names")
+                saveNamesDiv.innerHTML = "<h1>Choose your save name</h1>"
+                comm.getFileNameCandidates(folder, (data) => {
+                    //console.log(data.names)
+                    for(const name of data.names) {
+                        const nameDiv = document.createElement("div")
+                        nameDiv.textContent = name
+                        saveNamesDiv.appendChild(nameDiv)
+                        nameDiv.addEventListener("pointerdown", (ev) => {
+                            const saveFolder = folderInput.value
+                            if(saveFolder === "") {
+                                alert("Please specify the folder name")
+                                return
+                            }
+                            leds.saveToServer(folderInput.value, name)
+                            saveDiv.style.display = "none"
+                        })
+                    }
                 })
-                const saveNewDiv = document.getElementById("save_new")
-                saveNewDiv.innerHTML = "<h1>Clear all and start from scratch</h1>"
-                saveNewDiv.getElementsByTagName("h1")[0].addEventListener("pointerdown", (ev) => {
-                    const state = new Uint8Array(3 * leds.n_leds())
-                    leds.loadFromState(state)
-                    saveDiv.style.display = "none"
-                    requestAnimationFrame(leds.paintCanvas)
-                })
+                fetchSaves(folder)
             },
             div: null,
             help: "Save the current state to server"
