@@ -404,7 +404,7 @@ function makeLedManager(canvas) {
         selectedOnly &&= _isSelection
         const index = getLED(point, pointWidth)
         console.log(index)
-        if(index > -1 && !_leds[index].sameColour(colour) && (!selectedOnly || _leds[i].selected)) {
+        if(index > -1 && !_leds[index].sameColour(colour) && (!selectedOnly || _leds[index].selected)) {
             saveUndoRedo()
             _leds[index].setColour(colour)
             transmitState()
