@@ -534,6 +534,10 @@ function makeLedManager(canvas) {
         })
     }
 
+    manager.fill = function (colour) {
+        paintLeds(0, N_LEDS - 1, colour)
+    }
+
     manager.undoStep = function() {
         //console.log("undo queue " + _undoQueue.length + " redo queue " + _redoQueue.length)
         if(_undoQueue.length === 0)
@@ -608,7 +612,7 @@ function makeCommunicator() {
     }
 
     function sendToServer({ action='set', folder='', fileName='', state=null,
-                            mode=0, speed=0, callback=()=>{} } = {}) {
+                            mode=0, speed=0, callback=(x)=>{} } = {}) {
         if(!isLive && action === "set")
             return
 
@@ -619,6 +623,9 @@ function makeCommunicator() {
         switch (action) {
             case 'set':
                 msg = "/paint?state=" + btoa(String.fromCodePoint(...lastState))
+                break
+            case 'get':
+                msg = "/paint"
                 break
             case "save":
                 msg = "/save?save_as&folder=" + folder + "&name=" + fileName + "&state=" + btoa(String.fromCodePoint(...state))
@@ -653,15 +660,17 @@ function makeCommunicator() {
         });
     }
 
+    function updateLeds(data) {
+        if(data.hasOwnProperty("state")) {
+            const binString = atob(data.state);
+            ledsManger.setFromState(Uint8Array.from(binString, (m) => m.codePointAt(0)))
+            requestAnimationFrame(ledsManger.paintCanvas)
+        }
+    }
+
     function saveState() {
         saveLocally()
-        sendToServer({callback: (data) => {
-            if(data.hasOwnProperty("state")) {
-                const binString = atob(data.state);
-                ledsManger.setFromState(Uint8Array.from(binString, (m) => m.codePointAt(0)))
-                requestAnimationFrame(ledsManger.paintCanvas)
-            }
-        }})
+        sendToServer({ callback: updateLeds })
         updateQueued = false
         lastUpdate = Date.now()
     }
@@ -709,6 +718,7 @@ function makeCommunicator() {
         getFolderName: () => { return folderName },
         setFolderName: (s) => { folderName = s; localStorage.setItem("folder", s); console.log(s) },
         loadSaves: (folder, callback) => { sendToServer({ action: "load", folder, callback }) },
+        loadCurrentState: () => { sendToServer({action: "get", callback: updateLeds})},
         setAnimation: (mode, speed) => { sendToServer({action: "anim", mode, speed}) }
     }
     return comm

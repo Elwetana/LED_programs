@@ -13,7 +13,6 @@ import re
 import zmq
 
 from PIL import Image as pillowImg
-from colorsys import hls_to_rgb
 
 logger = logging.getLogger(__name__)
 N_LEDS = 200
@@ -73,21 +72,25 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
             self.server.state["mode"] = payload[5:]
 
     def serve_paint(self):
+        """
+        If parameter state was specified, we will do diff with the last state from the same client
+        and update the "leds" state with the diff.
+        In any case, we will send back the current state of leds
+        :return:
+        """
         qq = self.split_arguments()
-        if "state" not in qq:
-            self.wfile.write('{"result":"error", "error":"State argument is not present"}'.encode())
-            return
-        state: bytes = base64.b64decode(qq["state"])
         client = self.client_address[0]
         if client not in self.server.paint_state:
             self.server.paint_state[client] = bytes(3 * N_LEDS)
-        for led in range(N_LEDS):
-            if state[3 * led] != self.server.paint_state[client][3 * led] or \
-               state[3 * led + 1] != self.server.paint_state[client][3 * led + 1] or \
-               state[3 * led + 2] != self.server.paint_state[client][3 * led + 2]:
-                self.server.paint_state["leds"][3 * led + 0] = state[3 * led + 0]
-                self.server.paint_state["leds"][3 * led + 1] = state[3 * led + 1]
-                self.server.paint_state["leds"][3 * led + 2] = state[3 * led + 2]
+        if "state" in qq:
+            state: bytes = base64.b64decode(qq["state"])
+            for led in range(N_LEDS):
+                if state[3 * led] != self.server.paint_state[client][3 * led] or \
+                   state[3 * led + 1] != self.server.paint_state[client][3 * led + 1] or \
+                   state[3 * led + 2] != self.server.paint_state[client][3 * led + 2]:
+                    self.server.paint_state["leds"][3 * led + 0] = state[3 * led + 0]
+                    self.server.paint_state["leds"][3 * led + 1] = state[3 * led + 1]
+                    self.server.paint_state["leds"][3 * led + 2] = state[3 * led + 2]
         self.server.paint_state[client] = bytes(self.server.paint_state["leds"])
         base64_state = base64.b64encode(self.server.paint_state["leds"]).decode(encoding="utf-8")
         msg = "LED MSG set?%s" % base64_state
@@ -126,7 +129,7 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
         """
         Tries to get n name candidates, excluding the names already used
         Tries to balance the names from different categories
-        :param save_folder:
+        :param folder_name:
         :param n:
         :return:
         """

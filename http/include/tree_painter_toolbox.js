@@ -157,7 +157,7 @@ export function makeToolBox(leds, comm) {
             (pt, w) => {
                 leds.selectLed(pt, w, toolbar.selectMode.value)
             },
-            ["selectNone", "selectUnify", "selectMode"],
+            ["colour0", "selectFill", "selectNone", "selectUnify", "selectMode"],
             "Select and deselect LEDs. Use Unify Selection button to quickly select large number of LEDs"),
         adjust: {
             icon: "horizontal-slider",
@@ -419,6 +419,15 @@ export function makeToolBox(leds, comm) {
             div: null,
             help: "Switches between adding to and removing from the selection"
         },
+        selectFill: {
+            icon: "paint-bucket",
+            action: () => {
+                leds.fill(_selectedColour[0])
+                requestAnimationFrame(leds.paintCanvas)
+            },
+            div: null,
+            help: "Fill all selected LEDs with colour. If there is no selection, everything will be filled."
+        },
         noAnim: {
             icon: "anim-none",
             speed: 0,
@@ -481,6 +490,11 @@ export function makeToolBox(leds, comm) {
                     const state = new Uint8Array(3 * leds.n_leds())
                     leds.loadFromState(state)
                     document.getElementById("save").style.display = "none"
+                    requestAnimationFrame(leds.paintCanvas)
+                })
+                //Click get current state
+                document.getElementById("save_get").addEventListener("pointerdown", (ev) => {
+                    comm.loadCurrentState()
                     requestAnimationFrame(leds.paintCanvas)
                 })
                 //Click close to do nothing
