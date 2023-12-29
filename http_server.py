@@ -79,8 +79,8 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
         :return:
         """
         if self.server.state["source"] != "paint":
-            print("not painting")
             self.wfile.write(json.dumps({"result": "error", "error": "Not in the paint mode"}).encode())
+            return
         qq = self.split_arguments()
         client = self.client_address[0]
         if client not in self.server.paint_state:
