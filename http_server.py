@@ -78,6 +78,9 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
         In any case, we will send back the current state of leds
         :return:
         """
+        if self.server.state["source"] != "paint":
+            print("not painting")
+            self.wfile.write(json.dumps({"result": "error", "error": "Not in the paint mode"}).encode())
         qq = self.split_arguments()
         client = self.client_address[0]
         if client not in self.server.paint_state:
