@@ -495,6 +495,7 @@ export function makeToolBox(leds, comm) {
                 //Click get current state
                 document.getElementById("save_get").addEventListener("pointerdown", (ev) => {
                     comm.loadCurrentState()
+                    document.getElementById("save").style.display = "none"
                     requestAnimationFrame(leds.paintCanvas)
                 })
                 //Click close to do nothing
