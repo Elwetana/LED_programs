@@ -56,6 +56,7 @@ function makeLedManager(canvas) {
     let _isSelection = false
     const _leds = []
     let _weakSave = null
+    let _weakSelectionSave = null
     let _positionMode = ""
     let _activeConfig = 0
 
@@ -123,6 +124,14 @@ function makeLedManager(canvas) {
         return state
     }
 
+    function saveSelection() {
+        const state = new Uint8Array(N_LEDS)
+        for(let i = 0; i < N_LEDS; i++) {
+            state[i] = _leds[i].selected
+        }
+        return state
+    }
+
     /**
      * Restore state created by saveState
      * @param state {Uint8Array}
@@ -135,6 +144,16 @@ function makeLedManager(canvas) {
                 b: state[3*p+2]
             }
             _leds[p].setColourRGB(rgb)
+        }
+    }
+
+    /**
+     * Load selection state from array
+     * @param state {Uint8Array}
+     */
+    function loadSelection(state) {
+        for(let i = 0; i < N_LEDS; i++) {
+            _leds[i].selected = state[i]
         }
     }
 
@@ -189,60 +208,111 @@ function makeLedManager(canvas) {
           From = 1, to = 9, amount = 1:  0 1 4 2 3 6 5 8 7 9  -- wrap=true, selectedOnly=true
 
      * @param {number} amount
-     * @param {number} fromIndex
-     * @param {number} toIndex
      * @param {boolean} wrap
      * @param {boolean} selectedOnly
      * @param {HSLColour} wrapColor if wrap==false, the colour to assign to leds at the beginning
      */
-    function moveColours({amount, fromIndex = 0, toIndex = N_LEDS, wrap = true,
+    function moveColours({amount, wrap = true,
                          selectedOnly = true, wrapColour = makeHSL(0, 0, 0)}) {
         saveUndoRedo()
         selectedOnly &&= _isSelection
+        let fromIndex = 0
+        let toIndex = N_LEDS - 1
+        let dir = +1
         if(amount < 0) {
-            amount += N_LEDS
+            let temp = fromIndex
+            fromIndex = toIndex
+            toIndex = temp
+            dir = -1
         }
 
+        // We have to store _amount_ of leds in temp array, so that we can overwrite them with the
+        // leds that will move to this position. We copy _amount_ leds at the end, then we move
+        // leds in direction opposite to _dir_, i.e. when going right, we start at the right end
+        // and copy from left
         /** @type {HSLColour[]} */
         const colourBuff = []
         /**  @type {boolean[]} */
         const selectBuff = []
-        // 0 1 2 3 4 5 6; from = 2, to = 5, amount = 2 => buff = [3, 4]
-        // 0 1 3 4 2 5 6; ledIndex = 4 -> leds[2], ledIndex = 3 -> buff[1], ledIndex = 2 -> buff[0]
+
+        // This is copying to the temp array
         if(wrap) {
-            for(let i = toIndex - amount; i < toIndex; i++) {
-                colourBuff.push(_leds[i]._colour)  //position in buffer is ledIndex - fromIndex
+            for(let i = toIndex - amount + dir; i !== (toIndex + dir); i += dir) {
+                colourBuff.push(_leds[i]._colour)
                 selectBuff.push(_leds[i].selected)
             }
         }
         else {
-            colourBuff.concat(Array(amount).fill(wrapColour))
-            selectBuff.concat(Array(amount).fill(false))
+            for(let i = 0; i < dir * amount; i++) {
+                colourBuff.push(wrapColour.copy())
+            }
+            selectBuff.push(...Array(dir * amount).fill(false))
         }
 
-        /** @type {HSLColour[]} */
-        const unmoved = []
-        let ledIndex = toIndex - 1
-        while(ledIndex >= fromIndex) {
-            const sourceSelected = !selectedOnly || ((ledIndex - amount >= fromIndex) ?
-                _leds[ledIndex - amount].selected : selectBuff[ledIndex - fromIndex])
-            const selfSelected = !selectedOnly || _leds[ledIndex].selected
-            if(sourceSelected) {
-                if(!selfSelected) {
-                    unmoved.push(_leds[ledIndex]._colour)
+        let unmoved = []
+
+        // When we are moving only selected leds, we ideally don't move the
+        // unselected leds at all, but sometimes we have to move them out of the
+        // way so that the selected ones can move. We store those moved and unselected
+        // leds in the _unmoved_ array.
+        const moveWithSelectedOnly = (targetIndex, sourceSelected, sourceColour, updateUnmoved=true) => {
+            let targetSelected = _leds[targetIndex].selected
+            if (sourceSelected && targetSelected) {
+                //just copy
+                _leds[targetIndex]._colour = sourceColour
+            }
+            if (sourceSelected && !targetSelected) {
+                //save target to unmoved
+                //copy
+                if(updateUnmoved) unmoved.push(_leds[targetIndex]._colour);
+                _leds[targetIndex]._colour = sourceColour
+            }
+            if (!sourceSelected && targetSelected) {
+                //shift unmoved and use it
+                _leds[targetIndex]._colour = unmoved.shift()
+            }
+            if (!sourceSelected && !targetSelected) {
+                //do nothing if unmoved is empty
+                //otherwise push to unmoved and shift unmoved
+                if(unmoved.length > 0) {
+                    unmoved.push(_leds[targetIndex]._colour);
+                    _leds[targetIndex]._colour = unmoved.shift()
                 }
-                _leds[ledIndex]._colour = (ledIndex - amount >= fromIndex) ?
-                    _leds[ledIndex - amount]._colour : colourBuff[ledIndex - fromIndex]
+            }
+        }
+
+        // When moving selected leds only, we have to check the area we
+        // stored in the temp array whether it contains some unmoved leds
+        // (i.e. unselected leds that will be replaced by the selected ones)
+        if(selectedOnly) {
+            for(let i = dir * amount - 1; i >= 0 ; i--) {
+                if (selectBuff[i] && !_leds[fromIndex + dir * i].selected) {
+                    unmoved.push(_leds[fromIndex + dir * i]._colour)
+                }
+            }
+        }
+
+        // Move all the leds, except the _amount_ toward the _toIndex_
+        for(let ledIndex = toIndex; ledIndex !== fromIndex + amount - dir; ledIndex -= dir) {
+            if(selectedOnly) {
+                moveWithSelectedOnly(ledIndex, _leds[ledIndex - amount].selected, _leds[ledIndex - amount]._colour)
             }
             else {
-                if(selfSelected) {
-                    _leds[ledIndex]._colour = (unmoved.length > 0) ? unmoved.pop() : _leds[fromIndex]._colour
-                }
+                _leds[ledIndex]._colour = _leds[ledIndex - amount]._colour
             }
-            _leds[ledIndex].selected = (ledIndex - amount >= fromIndex) ?
-                _leds[ledIndex - amount].selected : selectBuff[ledIndex - fromIndex]
-            ledIndex--
+            _leds[ledIndex].selected = _leds[ledIndex - amount].selected
         }
+        // Move the _amount_ leds from temp array to the beginning
+        for(let i = dir * amount - 1; i >= 0 ; i--) {
+            if(selectedOnly) {
+                moveWithSelectedOnly(fromIndex + dir * i, selectBuff[i], colourBuff[i], false)
+            }
+            else {
+                _leds[fromIndex + dir * i]._colour = colourBuff[i]
+            }
+            _leds[fromIndex + dir * i].selected = selectBuff[i]
+        }
+
     }
 
     function shiftLedsHLS(amount, selectedOnly, shiftFunction) {
@@ -477,8 +547,10 @@ function makeLedManager(canvas) {
         }
         if(_weakSave !== null) {
             loadState(_weakSave)
+            loadSelection(_weakSelectionSave)
         } else {
             _weakSave = saveState()
+            _weakSelectionSave = saveSelection()
         }
         moveColours({amount, wrap, selectedOnly, wrapColour})
         return Math.abs(amount)
@@ -727,6 +799,126 @@ function makeCommunicator() {
 const comm = makeCommunicator()
 const ledsManger = makeLedManager(document.getElementById("treeCanvas"))
 
+
+/*
+function testLedMovement() {
+    const m = (c, s) => {
+        return {
+            _colour: c,
+            selected: s
+        }
+    }
+
+    let fromIndex = 0
+    let toIndex = 9
+    let _leds = Array(toIndex + 1).fill(0).map((v, i) => m(i, false))
+    _leds[4].selected = true
+    _leds[5].selected = true
+    _leds[6].selected = true
+
+    console.log(_leds.reduce((acc, l) => acc + (l.selected ? ">" + l._colour : " " + l._colour), ""))
+
+    let amount = -5
+    let wrap = true
+    let selectedOnly = true
+
+    let dir = +1
+    if(amount < 0) {
+        let temp = fromIndex
+        fromIndex = toIndex
+        toIndex = temp
+        dir = -1
+    }
+
+    // We have to store _amount_ of leds in temp array, so that we can overwrite them with the
+    // leds that will move to this position. We copy _amount_ leds at the end, then we move
+    // leds in direction opposite to _dir_, i.e. when going right, we start at the right end
+    // and copy from left
+    const colourBuff = []
+    const selectBuff = []
+
+    // This is copying to the temp array
+    if(wrap) {
+        for(let i = toIndex - amount + dir; i !== (toIndex + dir); i += dir) {
+            colourBuff.push(_leds[i]._colour)  //position in buffer is ledIndex - fromIndex
+            selectBuff.push(_leds[i].selected)
+        }
+    }
+    else {
+        for(let i = 0; i < dir * amount; i++) {
+            //colourBuff.push(wrapColour.copy())
+            colourBuff.push('W')
+        }
+        selectBuff.push(...Array(dir * amount).fill(false))
+    }
+
+    let unmoved = []
+
+    // When we are moving only selected leds, we ideally don't move the
+    // unselected leds at all, but sometimes we have to move them out of the
+    // way so that the selected ones can move. We store those moved and unselected
+    // leds in the _unmoved_ array.
+    const moveWithSelectedOnly = (targetIndex, sourceSelected, sourceColour, updateUnmoved=true) => {
+        let targetSelected = _leds[targetIndex].selected
+        if (sourceSelected && targetSelected) {
+            //just copy
+            _leds[targetIndex]._colour = sourceColour
+        }
+        if (sourceSelected && !targetSelected) {
+            //save target to unmoved
+            //copy
+            if(updateUnmoved) unmoved.push(_leds[targetIndex]._colour);
+            _leds[targetIndex]._colour = sourceColour
+        }
+        if (!sourceSelected && targetSelected) {
+            //shift unmoved and use it
+            _leds[targetIndex]._colour = unmoved.shift()
+        }
+        if (!sourceSelected && !targetSelected) {
+            //do nothing if unmoved is empty
+            //otherwise push to unmoved and shift unmoved
+            if(unmoved.length > 0) {
+                unmoved.push(_leds[targetIndex]._colour);
+                _leds[targetIndex]._colour = unmoved.shift()
+            }
+        }
+    }
+
+    // When moving selected leds only, we have to check the area we
+    // stored in the temp array whether it contains some unmoved leds
+    // (i.e. unselected leds that will be replaced by the selected ones)
+    if(selectedOnly) {
+        for(let i = dir * amount - 1; i >= 0 ; i--) {
+            if (selectBuff[i] && !_leds[fromIndex + dir * i].selected) {
+                unmoved.push(_leds[fromIndex + dir * i]._colour)
+            }
+        }
+    }
+
+    // Move all the leds, except the _amount_ toward the _toIndex_
+    for(let ledIndex = toIndex; ledIndex !== fromIndex + amount - dir; ledIndex -= dir) {
+        if(selectedOnly) {
+            moveWithSelectedOnly(ledIndex, _leds[ledIndex - amount].selected, _leds[ledIndex - amount]._colour)
+        }
+        else {
+            _leds[ledIndex]._colour = _leds[ledIndex - amount]._colour
+        }
+        _leds[ledIndex].selected = _leds[ledIndex - amount].selected
+    }
+    // Move the _amount_ leds from temp array to the beginning
+    for(let i = dir * amount - 1; i >= 0 ; i--) {
+        if(selectedOnly) {
+            moveWithSelectedOnly(fromIndex + dir * i, selectBuff[i], colourBuff[i], false)
+        }
+        else {
+            _leds[fromIndex + dir * i]._colour = colourBuff[i]
+        }
+        _leds[fromIndex + dir * i].selected = selectBuff[i]
+    }
+    console.log(_leds.reduce((acc, l) => acc + (l.isSelected ? ">" + l._colour : " " + l._colour), ""))
+}
+//*/
+
 function start() {
     const toolbox = makeToolBox(ledsManger, comm)
     document.getElementById("save_folder").addEventListener("change", (ev) => {
@@ -741,4 +933,5 @@ function start() {
     logDiv.innerHTML += "<p>Viewport width " + window.visualViewport.width + "</p>"
     logDiv.innerHTML += "<p>Viewport scale " + window.visualViewport.scale + "</p>"
     logDiv.innerHTML += "<p>canvas width " + document.getElementById("treeCanvas").offsetWidth + "</p>"
+    //testLedMovement()
 }
