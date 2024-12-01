@@ -11,6 +11,7 @@ import os
 import os.path
 import re
 import zmq
+from typing import Dict, List, Union, TypedDict
 
 from PIL import Image as pillowImg
 
@@ -19,12 +20,33 @@ N_LEDS = 200
 N_THUMB_SIZE = 16
 
 
+class KeyFrameState(TypedDict):
+    keyframes: List[str]  # base64 encoded states
+    frame_times: List[int]
+    last_client: str
+
+
+class SaveInfo(TypedDict):
+    saves: Dict[str, str]
+    folders: List[str]
+    result: str
+
+
+class LEDHttpServerClass(ThreadingHTTPServer):
+    broadcaster: zmq.Socket
+    config_path: str
+    state: Dict[str, str]
+    paint_state: Dict[str, bytearray]
+    kf_state: KeyFrameState
+
+
 class LEDHttpHandler(BaseHTTPRequestHandler):
 
+    server: LEDHttpServerClass
     save_names = {"Sunshine": "nature", "Mountain": "nature", "Ocean": "nature", "Butterfly": "nature", "Rainbow": "nature", "Garden": "nature", "Stream": "nature", "Bird": "nature", "Breeze": "nature", "Orchard": "nature", "Star": "nature", "Meadow": "nature", "Forest": "nature", "Beach": "nature", "Valley": "nature", "Flower": "nature", "Hill": "nature", "Glacier": "nature", "Waterfall": "nature", "River": "nature", "Balloon": "object", "Sunrise": "nature", "Sunset": "nature", "Fountain": "object", "Park": "nature", "Raindrop": "nature", "Rainforest": "nature", "Puppy": "animal", "Kitten": "animal", "Book": "object", "Bridge": "object", "Fireplace": "object", "Lighthouse": "object", "Sandbox": "object", "VanGogh": "painter", "Rembrandt": "painter", "DaVinci": "painter", "Michelangelo": "painter", "Picasso": "painter", "Monet": "painter", "Dali": "painter", "Cezanne": "painter", "Raphael": "painter", "Titian": "painter", "Caravaggio": "painter", "Vermeer": "painter", "Hokusai": "painter", "Goya": "painter", "Turner": "painter", "Constable": "painter", "Rodin": "painter", "Klimt": "painter", "Manet": "painter", "Matisse": "painter", "Renoir": "painter", "Degas": "painter", "Botticelli": "painter", "Bruegel": "painter", "ElGreco": "painter", "Gauguin": "painter", "Magritte": "painter", "Pillow": "object", "Cushion": "object", "Blanket": "object", "Quilt": "object", "Mug": "object", "Sweater": "object", "Scarf": "object", "Firework": "object", "Lantern": "object", "Candle": "object", "Gift": "object", "Snowflake": "nature", "Reindeer": "animal", "Sleigh": "object", "Ornament": "object", "Mistletoe": "nature", "Gingerbread": "food", "Chocolate": "food", "Eggnog": "food", "Bell": "object", "Carols": "music", "Snowman": "nature", "Ice": "nature", "Ski": "object", "Snowboard": "object", "Pinecone": "nature", "Holly": "nature", "Tinsel": "object", "Cherry": "fruit", "Strawberry": "fruit", "Apple": "fruit", "Pear": "fruit", "Peach": "fruit", "Banana": "fruit", "Blueberry": "fruit", "Raspberry": "fruit", "Blackberry": "fruit", "Pineapple": "fruit", "Coconut": "fruit", "Lemon": "fruit", "Orange": "fruit", "Melon": "fruit", "Apricot": "fruit", "Fig": "fruit", "Plum": "fruit", "Guitar": "music", "Piano": "music", "Violin": "music", "Flute": "music", "Saxophone": "music", "Trumpet": "music", "Lion": "animal", "Giraffe": "animal"}
 
-    def split_arguments(self):
-        result = {}
+    def split_arguments(self) -> Dict[str, Union[str, None]]:
+        result: Dict[str, Union[str, None]] = {}
         parts = self.path.split("?")
         if len(parts) > 2:
             self.log_error("Invalid path %s" % self.path)
@@ -84,22 +106,97 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
         qq = self.split_arguments()
         client = self.client_address[0]
         if client not in self.server.paint_state:
-            self.server.paint_state[client] = bytes(3 * N_LEDS)
+            self.server.paint_state[client] = bytearray(3 * N_LEDS)
         if "state" in qq:
             state: bytes = base64.b64decode(qq["state"])
             for led in range(N_LEDS):
-                if state[3 * led] != self.server.paint_state[client][3 * led] or \
+                if state[3 * led + 0] != self.server.paint_state[client][3 * led + 0] or \
                    state[3 * led + 1] != self.server.paint_state[client][3 * led + 1] or \
                    state[3 * led + 2] != self.server.paint_state[client][3 * led + 2]:
                     self.server.paint_state["leds"][3 * led + 0] = state[3 * led + 0]
                     self.server.paint_state["leds"][3 * led + 1] = state[3 * led + 1]
                     self.server.paint_state["leds"][3 * led + 2] = state[3 * led + 2]
-        self.server.paint_state[client] = bytes(self.server.paint_state["leds"])
+        self.server.paint_state[client] = bytearray(self.server.paint_state["leds"])
         base64_state = base64.b64encode(self.server.paint_state["leds"]).decode(encoding="utf-8")
         msg = "LED MSG set?%s" % base64_state
         self.server.broadcaster.send_string(msg)
         logger.info("ZMQ message sent: %s" % msg)
         self.wfile.write(json.dumps({"result": "ok", "state": base64_state}).encode())
+
+    def keyframes_process_command(self, qq: Dict[str, str]) -> str:
+        """
+        kf?command=add&state=<base64 encoded RGB values>
+        kf?command=del&position=<int position in linked list>
+        kf?command=update&position=<pos>&state=<base 64 encoded>
+        kf?command=time&position=<pos>&time=<int timing>
+        kf?command=swap&from=<pos1>&to=<pos2>
+
+        :return: message to send to server
+        """
+        if qq["command"] == "add":
+            self.server.kf_state["keyframes"].append(qq["state"])
+            self.server.kf_state["frame_times"].append(100)
+            return "LED MSG add?%s" % qq["state"]
+
+        # for all commands but add, client needs to be updated first if the kf data were modified
+        if self.server.kf_state["last_client"] != self.client_address[0]:
+            return ""
+
+        n_frames = len(self.server.kf_state["keyframes"])
+        if qq["command"] == "del":
+            position = int(qq["position"])
+            if position < n_frames:
+                del self.server.kf_state["keyframes"][position]
+                return "LED MSG del?%s" % position
+        elif qq["command"] == "update":
+            position = int(qq["position"])
+            if position < n_frames:
+                self.server.kf_state["keyframes"][position] = qq["state"]
+                return "LED MSG update?%s&%s" % (position, qq["state"])
+        elif qq["command"] == "time":
+            position = int(qq["position"])
+            timing = int(qq["time"])
+            if position < n_frames:
+                self.server.kf_state["frame_times"][position] = timing
+                return "LED MSG time?%s&%s" % (position, timing)
+        elif qq["command"] == "swap":
+            from_position = int(qq["from"])
+            to_position = int(qq["to"])
+            if from_position < n_frames and to_position < n_frames:
+                tmp = self.server.kf_state["keyframes"][to_position]
+                self.server.kf_state["keyframes"][to_position] = self.server.kf_state["keyframes"][from_position]
+                self.server.kf_state["keyframes"][from_position] = tmp
+                tmp2 = self.server.kf_state["frame_times"][to_position]
+                self.server.kf_state["frame_times"][to_position] = self.server.kf_state["frame_times"][from_position]
+                self.server.kf_state["frame_times"][from_position] = tmp2
+                return "LED MSG swap?%s&%s" % (from_position, to_position)
+        else:
+            logger.error("Unknown command for keyframes %s" % qq["command"])
+            return ""
+        logger.error("Invalid parameter for command %s" % qq["command"])
+        return ""
+
+    def serve_keyframes(self):
+        if self.server.state["source"] != "paint":
+            self.wfile.write(json.dumps({"result": "error", "error": "Not in the paint mode"}).encode())
+            return
+        qq = self.split_arguments()
+        if "command" not in qq:
+            logger.error("Invalid keyframe message %s" % self.path)
+            self.wfile.write(json.dumps({"result": "error", "error": "Invalid request"}).encode())
+            return
+
+        msg = self.keyframes_process_command(qq)
+
+        if msg != "":
+            self.server.broadcaster.send_string(msg)
+            logger.info("ZMQ message sent: %s" % msg)
+        self.server.kf_state["last_client"] = self.client_address[0]
+        self.wfile.write(json.dumps({
+            "result": "ok",
+            "keyframes": self.server.kf_state["keyframes"],
+            "frame_times": self.server.kf_state["frame_times"]
+        }).encode())
 
     def serve_config(self):
         if "?" not in self.path:
@@ -146,25 +243,26 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
                     name, ext = os.path.splitext(stuff)
                     if ext == ".png" and name in names:
                         del names[name]
-        categories = {}
+        categories: Dict[str, List[str]] = {}
         for name, category in names.items():
             if category not in categories:
                 categories[category] = []
             categories[category].append(name)
         while True:
             max_names = 0
-            max_category = 0
+            max_category = ""
             total = 0
-            for category, names in categories.items():
-                total += len(names)
-                if len(names) > max_names:
+            for category, cat_names in categories.items():
+                total += len(cat_names)
+                if len(cat_names) > max_names:
                     max_category = category
-                    max_names = len(names)
+                    max_names = len(cat_names)
             if total <= n:
                 break
             del categories[max_category][random.randrange(max_names)]
         result = []
-        [result.extend(x) for x in categories.values()]
+        for x in categories.values():
+            result.extend(x)
         self.wfile.write(json.dumps({"result": "ok", "names": result}).encode())
 
     def save_state(self, folder_name, save_name, state):
@@ -177,7 +275,7 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
         self.wfile.write('{"result":"ok"}'.encode())
 
     def load_saves(self, folder_name):
-        result = {"saves": {}}
+        result: SaveInfo = {"saves": {}, "folders": [], "result": ""}
         save_folder = "saves/%s" % folder_name
         if os.path.exists(save_folder) and os.path.isdir(save_folder):
             all_stuff = os.listdir(save_folder)
@@ -187,7 +285,6 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
                     base64_state = LEDHttpHandler.load_state_from_png(file_name)
                     name, ext = os.path.splitext(file_name)
                     result["saves"][name] = base64_state
-        result["folders"] = []
         for stuff in os.listdir("saves/"):
             if os.path.isdir(os.path.join("saves/", stuff)):
                 result["folders"].append(stuff)
@@ -243,6 +340,8 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
             self.serve_save()
         elif self.path[0:6] == "/paint":
             self.serve_paint()
+        elif self.path[0:3] == "/kf":
+            self.serve_keyframes()
         else:
             self.serve_file(is_binary)
 
@@ -259,7 +358,7 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
     @staticmethod
     def save_state_as_png(base64_state, file_name):
         state = base64.b64decode(base64_state)
-        missing_bytes = (N_THUMB_SIZE * N_THUMB_SIZE - N_LEDS) * 3 
+        missing_bytes = (N_THUMB_SIZE * N_THUMB_SIZE - N_LEDS) * 3
         png = pillowImg.frombytes("RGB", (N_THUMB_SIZE, N_THUMB_SIZE), state + bytes(missing_bytes))
         png.save(file_name, "PNG")
 
@@ -273,7 +372,7 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
     def get_config(self):
         if not os.path.exists(self.server.config_path):
             return {"error": "config file not found"}
-        d = {}
+        d: Dict[str, Dict[int, Dict[str, str]]] = {}
         with open(self.server.config_path, "r") as fc:
             ll = fc.readlines()
         i = 0
@@ -324,7 +423,7 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
         if not os.path.exists(self.server.config_path):
             return {"error": "config file not found"}
         aa = s[0:-1].split("&")
-        d = {}
+        d: Dict[str, Dict[int, str]] = {}
         for a in aa:
             name_n, col = a.split("=")
             name, n = name_n.split("__")
@@ -396,7 +495,7 @@ class LEDHttpServer:
     serverPort = 80
     timeout = 0.1
     zmqPort = "tcp://*:5556"
-    
+
     def get_IP_address(self):
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
@@ -409,7 +508,7 @@ class LEDHttpServer:
         else:
             LEDHttpServer.serverIP = self.get_IP_address()
         logger.info("Server address: %s" % LEDHttpServer.serverIP)
-        self.server = ThreadingHTTPServer((LEDHttpServer.serverIP, LEDHttpServer.serverPort), LEDHttpHandler)
+        self.server = LEDHttpServerClass((LEDHttpServer.serverIP, LEDHttpServer.serverPort), LEDHttpHandler)
         self.server.timeout = LEDHttpServer.timeout
         self.server.config_path = args.config_path
         logger.warning("Threading HTTP server running")
@@ -420,7 +519,8 @@ class LEDHttpServer:
         self.server.broadcaster.bind(LEDHttpServer.zmqPort)
         self.server.state = {"source": "embers", "color": "#FFFFFF", "mode": ""}
         self.server.paint_state = {"leds": bytearray(3 * N_LEDS)}
-        
+        self.server.kf_state = {"keyframes": [], "frame_times": [], "last_client": ""}
+
         try:
             while True:
                 self.server.handle_request()

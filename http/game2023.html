@@ -101,10 +101,10 @@
         }
         
         div#save {
-            position: fixed;
+            /*position: fixed;
             top: 3px;
             left: 3px;            
-            background-color: wheat;
+            background-color: wheat;*/
             font-family: Verdana, Arial, Helvetica, sans-serif;
         }
         div#save div.button_container {
@@ -141,9 +141,80 @@
             font-size: 1.5rem;
         }
 
+        div#keyframe {
+            background-color: aliceblue;
+        }
+
+        div.keyframe_item {
+            height: 60px;
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+        }
+
+        div.keyframe_thumb {
+            display: flex;
+        }
+
+        div.keyframe_thumb canvas {
+            width: 22px;
+            height: 42px;
+        }
+
+        div.keyframe_controls {
+            display: flex;
+            align-items: center;
+        }
+
+        div.keyframe_controls div {
+            display: flex;
+            flex-direction: column;
+        }
+
+        div.keyframe_controls label {
+            display: block;
+            width: 5vw;
+            text-align: right;
+        }
+
+        input.keyframe_duration {
+
+        }
+
+        div.keyframe_load_delete {
+
+        }
+
+        div.keyframe_controls input[type="button"] {
+            width: 32px;
+            background-size: contain;
+            background-repeat: no-repeat;
+            aspect-ratio: 1/1;
+            border: none;
+        }
+
+        input.keyframe_load {
+            background-image: url("include/open-outline.svg");
+        }
+
+        input.keyframe_delete {
+            background-image: url("include/close-circle-outline.svg");
+        }
+
+        div.keyframe_up_down {
+
+        }
+
+        input.keyframe_up {
+            background-image: url("include/caret-up-outline.svg");
+        }
+
+        input.keyframe_down {
+            background-image: url("include/caret-down-outline.svg");
+        }
+
 
     </style>
-    <!-- script src="js/iro.min.js"></script -->
     <script type="module" src="js/tree_painter.js"></script>
 </head>
 <body style="background-color: blanchedalmond;">
@@ -153,24 +224,41 @@
         <div id="tools">
             <div id="toolbar"></div>
             <div id="toolbox"></div>
-            <div id="picker" style="display: none;"></div>
-            <div id="save" style="display: none;">
-                <h1>Select name of your save folder</h1>
-                <label for="save_folder">Folder name</label>
-                <input type="text" value="" id="save_folder" name="save_folder">
-                <div id="save_names" class="button_container"></div>
-                <div id="save_load" class="button_container"></div>
-                <div id="save_folders" class="button_container"></div>
-                <div class="button_container">
-                    <h1>Other controls</h1>
-                    <div id="save_new" class="save_button">Clear all and start from scratch</div>
-                    <div id="save_get" class="save_button">Get current tree</div>
-                    <div id="save_close" class="save_button">Close this window</div>
-                </div>
-            </div>
-            <div id="help" style="display: none"></div>
         </div>
         <canvas id="treeCanvas"></canvas>
+        <div id="picker" style="display: none;"></div>
+        <div id="save" style="display: none;">
+            <h1>Select name of your save folder</h1>
+            <label for="save_folder">Folder name</label>
+            <input type="text" value="" id="save_folder" name="save_folder">
+            <div id="save_names" class="button_container"></div>
+            <div id="save_load" class="button_container"></div>
+            <div id="save_folders" class="button_container"></div>
+            <div class="button_container">
+                <h1>Other controls</h1>
+                <div id="save_new" class="save_button">Clear all and start from scratch</div>
+                <div id="save_get" class="save_button">Get current tree</div>
+                <div id="save_close" class="save_button">Close this window</div>
+            </div>
+        </div>
+        <div id="help" style="display: none"></div>
+        <div id="keyframe" style="display: none">
+            <div class="keyframe_item">
+                <div class="keyframe_thumb"></div>
+                <div class="keyframe_controls">
+                    <label for="keyframe_duration_01">100</label>
+                    <input id="keyframe_duration_01" type="range" class="keyframe_duration" min="0" max="100" step="any">
+                    <div class="keyframe_load_delete">
+                        <input type="button" class="keyframe_load">
+                        <input type="button" class="keyframe_delete">
+                    </div>
+                    <div class="keyframe_up_down">
+                        <input type="button" class="keyframe_up">
+                        <input type="button" class="keyframe_down">
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
     <!-- Turned off for production -->
     <div id="log" style="width: 100%; height: auto; display: none"></div>

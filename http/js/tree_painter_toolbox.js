@@ -17,9 +17,12 @@ import { makeColourPicker } from './tree_painter_colour_picker.js'
 *   | Clr 1 | Clr 2 | Swap  | EyeDr | Undo  | Redo  |
 *   =================================================
 *   | Brush | Grad  | Move  | Slect | Adjst | File  |
+*
+*   https://ionic.io/ionicons
+*   https://home.streamlinehq.com
 * */
 
-export function makeToolBox(leds, comm) {
+export function makeToolBox(leds, comm, keyframes) {
     let _selectedColour = [makeHSL(0, 100, 50), makeHSL(120, 100, 50)]
     let _activeColour = 0
     let _currentTool = 'brush'
@@ -28,14 +31,29 @@ export function makeToolBox(leds, comm) {
     const THUMB_WIDTH = 16
     const THUMB_HEIGHT = 16
 
-    function createHelp() {
-
-        function createDiv(parent, className) {
-            const d = document.createElement("div")
-            d.classList.add(className)
-            parent.appendChild(d)
-            return d
+    /**
+     *
+     * @param tagName {string}
+     * @param parent {HTMLElement}
+     * @param className {string}
+     * @param attributes {Record<string,string>}
+     * @return {HTMLAnchorElement | HTMLElement | HTMLAreaElement | HTMLAudioElement | HTMLBaseElement | HTMLQuoteElement | HTMLBodyElement | HTMLBRElement | HTMLButtonElement | HTMLCanvasElement | HTMLTableCaptionElement | HTMLTableColElement | HTMLDataElement | HTMLDataListElement | HTMLModElement | HTMLDetailsElement | HTMLDialogElement | HTMLDivElement | HTMLDListElement | HTMLEmbedElement | HTMLFieldSetElement | HTMLFormElement | HTMLHeadingElement | HTMLHeadElement | HTMLHRElement | HTMLHtmlElement | HTMLIFrameElement | HTMLImageElement | HTMLInputElement | HTMLLabelElement | HTMLLegendElement | HTMLLIElement | HTMLLinkElement | HTMLMapElement | HTMLMenuElement | HTMLMetaElement | HTMLMeterElement | HTMLObjectElement | HTMLOListElement | HTMLOptGroupElement | HTMLOptionElement | HTMLOutputElement | HTMLParagraphElement | HTMLPictureElement | HTMLPreElement | HTMLProgressElement | HTMLScriptElement | HTMLSelectElement | HTMLSlotElement | HTMLSourceElement | HTMLSpanElement | HTMLStyleElement | HTMLTableElement | HTMLTableSectionElement | HTMLTableCellElement | HTMLTemplateElement | HTMLTextAreaElement | HTMLTimeElement | HTMLTitleElement | HTMLTableRowElement | HTMLTrackElement | HTMLUListElement | HTMLVideoElement}
+     */
+    function createElement(tagName, parent, className, attributes={}) {
+        let e= document.createElement(tagName)
+        e.classList.add(className)
+        parent.appendChild(e)
+        for(let att in attributes) {
+            e.setAttribute(att, attributes[att])
         }
+        return e
+    }
+
+    function createDiv(parent, className) {
+        return createElement("div", parent, className)
+    }
+
+    function createHelp() {
 
         function createHelpForContainer(container, heading) {
             const containerHelpDiv = createDiv(helpDiv, "help_tool_container")
@@ -171,7 +189,7 @@ export function makeToolBox(leds, comm) {
             icon: "anim",
             startTool: () => {},
             endTool: () => {},
-            toolbar: ["noAnim", "moveAnim", "aaMoveAnim", "shimmerAnim", "moveShimmerAnim"],
+            toolbar: ["noAnim", "moveAnim", "aaMoveAnim", "shimmerAnim", "moveShimmerAnim", "addKeyframe"],
             div: null,
             help: "Opens menu where you can select global animation mode and speed"
         },
@@ -236,10 +254,8 @@ export function makeToolBox(leds, comm) {
                 requestAnimationFrame(leds.paintCanvas)
             })
 
-            const closeDiv = document.createElement("div")
-            closeDiv.classList.add("tool_item")
+            const closeDiv = createDiv(toolbarDiv, "tool_item")
             closeDiv.style.backgroundImage = 'url("include/capital-X-line.svg")'
-            toolbarDiv.appendChild(closeDiv)
             closeDiv.addEventListener("pointerdown", (ev) => {
                 ev.stopPropagation()
                 leds.applyState()
@@ -290,10 +306,8 @@ export function makeToolBox(leds, comm) {
             })
 
             //TODO reuse with makeShiftAction
-            const closeDiv = document.createElement("div")
-            closeDiv.classList.add("tool_item")
+            const closeDiv = createDiv(toolbarDiv, "tool_item")
             closeDiv.style.backgroundImage = 'url("include/capital-X-line.svg")'
-            toolbarDiv.appendChild(closeDiv)
             closeDiv.addEventListener("pointerdown", (ev) => {
                 ev.stopPropagation()
                 createToolbarForCurrentTool()
@@ -301,8 +315,111 @@ export function makeToolBox(leds, comm) {
         }
     }
 
+    function showKeyframeUI() {
+        const C_SLIDER_MIN = 0
+        const C_SLIDER_MAX = 100
+        const C_MIN_DURATION = 50     // ms
+        const C_MAX_DURATION = 90000  //90 seconds
+        const C_ADDITIVE_CONST = 0
+        const C_AMPLITUDE = (C_MIN_DURATION - C_ADDITIVE_CONST)
+        const C_COEFFICIENT = Math.log((C_MAX_DURATION - C_ADDITIVE_CONST)/C_AMPLITUDE)/C_SLIDER_MAX
+        /**
+         * @param value {number}
+         * @return {number}
+         */
+        const sliderToDuration = (value) => Math.trunc(C_AMPLITUDE * Math.exp(C_COEFFICIENT * value) + C_ADDITIVE_CONST)
+        const durationToValue = (duration) => Math.log((duration - C_ADDITIVE_CONST)/C_AMPLITUDE) / C_COEFFICIENT
+        /**
+         * @param duration {number}
+         * @return {string}
+         */
+        const durationToString = (duration) => duration.toLocaleString("en-US", {
+            style: "unit", unit: "millisecond", unitDisplay: "short", maximumFractionDigits: 0})
+
+        /**
+         * Create common frame UI: slider, move up/down, delete
+         * @param frameDiv {HTMLDivElement}
+         * @param n {number}
+         * @param timing {number}
+         */
+        function makeKeyframeControls(frameDiv, n, timing) {
+            let controlDiv = createDiv(frameDiv, "keyframe_controls")
+
+            //Add duration slider and label
+            let sizeId = 'keyframe_duration_' + n
+            let label = createElement("label", controlDiv, "keyframe_label", {for: sizeId})
+            label.innerText = durationToString(timing)
+            let slider = createElement("input", controlDiv, "keyframe_duration", {
+                min: C_SLIDER_MIN.toString(),
+                max: C_SLIDER_MAX.toString(),
+                type: "range",
+                step: "any",
+                value: durationToValue(timing)
+            })
+            slider.addEventListener("input", (ev) => {
+                const duration = sliderToDuration(slider.value)
+                label.innerText = durationToString(duration)
+            })
+            slider.addEventListener("change", (ev) => {
+                keyframes.updateTiming(n, sliderToDuration(ev.target.value))
+            })
+
+            //Add buttons
+            const buttons = {
+                keyframe_load_delete: {
+                    keyframe_load: (event) => {
+                        const state = keyframes.getKeyframe(n)
+                        leds.loadFromState(state)
+                        showHideCanvas("")
+                    },
+                    keyframe_delete: (event) => {
+                        keyframes.deleteKeyframe(n)
+                        //showKeyframeUI()
+                    }
+                },
+                keyframe_up_down: {
+                    keyframe_up: (event) => {
+                        keyframes.swapKeyframe(n)
+                        //showKeyframeUI()
+                    },
+                    keyframe_down: (event) => {
+                        keyframes.swapKeyframe(n + 1)
+                        //showKeyframeUI()
+                    }
+                }
+            }
+            for(let divStyle in buttons) {
+                const div = createDiv(controlDiv, divStyle)
+                for(let buttonStyle in buttons[divStyle]) {
+                    const button = createElement("input", div, buttonStyle, {type: "button"})
+                    button.addEventListener("pointerdown", buttons[divStyle][buttonStyle])
+                }
+            }
+        }
+
+        const kfDiv = document.getElementById("keyframe")
+        kfDiv.innerHTML = ""
+        const nFrames = keyframes.getKeyframesCount()
+        console.log("Keyframes " + nFrames)
+        for(let i = 0; i < nFrames; i++) {
+            const frameDiv = createDiv(kfDiv, "keyframe_item")
+            const thumbnailDiv = createDiv(frameDiv, "keyframe_thumb")
+            keyframes.renderThumbnail(thumbnailDiv, i)
+            makeKeyframeControls(frameDiv, i, keyframes.getTiming(i))
+        }
+        if(nFrames > 0) {
+            const upButtons = kfDiv.getElementsByClassName("keyframe_up")
+            upButtons.item(0).style.visibility = "hidden"
+            const downButtons = kfDiv.getElementsByClassName("keyframe_down")
+            downButtons.item(upButtons.length - 1).style.visibility = "hidden"
+        }
+        showHideCanvas("addKeyframe")
+    }
+
+    keyframes.registerUIUpdater(showKeyframeUI)
+
     /**
-     * @type {Object.<string,{icon: string, action: function, div: {HTMLDivElement}|null}>}
+     * @type {Object.<string,{icon: string, action: function, div: HTMLDivElement, value?:any}|{null}>}
      */
     const toolbar = {
         undo: {
@@ -463,6 +580,15 @@ export function makeToolBox(leds, comm) {
             div: null,
             help: "Combination of the two preceding modes"
         },
+        addKeyframe: {
+            icon: "anim-add-frame",
+            action: () => {
+                keyframes.addKeyFrame(leds.getState(), showKeyframeUI)
+                //keyframes.updateTiming(i, 100)
+            },
+            div: null,
+            help: "Add new keyframe to animation"
+        },
         ledPlacement: {
             icon: "led-position",
             value: false,
@@ -489,19 +615,18 @@ export function makeToolBox(leds, comm) {
                 document.getElementById("save_new").addEventListener("pointerdown", (ev) => {
                     const state = new Uint8Array(3 * leds.n_leds())
                     leds.loadFromState(state)
-                    document.getElementById("save").style.display = "none"
+                    showHideCanvas("")
                     requestAnimationFrame(leds.paintCanvas)
                 })
                 //Click get current state
                 document.getElementById("save_get").addEventListener("pointerdown", (ev) => {
                     comm.loadCurrentState()
-                    document.getElementById("save").style.display = "none"
+                    showHideCanvas("")
                     requestAnimationFrame(leds.paintCanvas)
                 })
                 //Click close to do nothing
                 document.getElementById("save_close").addEventListener("pointerdown", (ev) => {
-                    document.getElementById("save").style.display = "none"
-                    requestAnimationFrame(leds.paintCanvas)
+                    showHideCanvas("")
                 })
 
             },
@@ -538,7 +663,7 @@ export function makeToolBox(leds, comm) {
                         saveLoadDiv.appendChild(loadDiv)
                         loadDiv.addEventListener("pointerdown", (ev) => {
                             leds.loadFromState(state)
-                            saveDiv.style.display = "none"
+                            showHideCanvas("")
                             requestAnimationFrame(leds.paintCanvas)
                         })
                     }
@@ -583,7 +708,7 @@ export function makeToolBox(leds, comm) {
                                 return
                             }
                             leds.saveToServer(folderInput.value, name)
-                            saveDiv.style.display = "none"
+                            showHideCanvas("")
                         })
                     }
                 })
@@ -618,14 +743,30 @@ export function makeToolBox(leds, comm) {
         },
         showHelp: {
             icon: "question-mark",
-            value: false,
-            action: makeStateHolderAction ("showHelp", false, (value) => {
-                document.getElementById("help").style.display = value ? "none" : "block"
-            }),
+            action: () => {},
             div: null,
             help: "Show this help"
         }
 
+    }
+
+    const canvasHidingButtons = {
+        showHelp: 'help',
+        save: 'save',
+        addKeyframe: 'keyframe'
+    }
+    function showHideCanvas(button) {
+        if(button in canvasHidingButtons) {
+            document.getElementById("treeCanvas").style.display = "none"
+            document.getElementById(canvasHidingButtons[button]).style.display = "block"
+        }
+        else {
+            document.getElementById("treeCanvas").style.display = "block"
+            for(let [button, buttonId] of Object.entries(canvasHidingButtons)) {
+                document.getElementById(buttonId).style.display = "none"
+            }
+            requestAnimationFrame(leds.paintCanvas)
+        }
     }
 
     function createToolbarForCurrentTool() {
@@ -637,12 +778,10 @@ export function makeToolBox(leds, comm) {
         for(const button of toolbox[_currentTool].toolbar) {
             _currentToolbar.push(button)
             const buttonDef = toolbar[button]
-            const buttonDiv = document.createElement("div")
-            buttonDiv.className = "tool_item"
+            const buttonDiv = createDiv(toolbarDiv, "tool_item")
             if (buttonDef.icon !== "") {
                 buttonDiv.style.backgroundImage = 'url("include/' + buttonDef.icon + '-line.svg")'
             }
-            toolbarDiv.appendChild(buttonDiv)
             buttonDef.div = buttonDiv
             //some buttons hold state that is persistent per opening/closing of the toolbar
             //we need to update the icon accordingly
@@ -650,20 +789,22 @@ export function makeToolBox(leds, comm) {
                 buttonDef.value = !buttonDef.value
                 buttonDef.action()
             }
-            buttonDiv.addEventListener("pointerdown", buttonDef.action)
+            buttonDiv.addEventListener("pointerdown", (ev) => {
+                showHideCanvas(button)
+                buttonDef.action(ev)
+            })
         }
         setColours()
     }
 
     function initToolbox() {
+        console.log("INIT TOOLBOX")
         for (const [toolName, toolDef] of Object.entries(toolbox)) {
 
-            const toolDiv = document.createElement("div")
-            toolDiv.className = "tool_item"
+            const toolDiv = createDiv(document.getElementById("toolbox"), "tool_item")
             if (toolDef.icon !== "") {
                 toolDiv.style.backgroundImage = 'url("include/' + toolDef.icon + '-line.svg")'
             }
-            document.getElementById("toolbox").appendChild(toolDiv)
             toolDiv.addEventListener("pointerdown", (ev) => {
                 ev.preventDefault()
                 ev.stopImmediatePropagation()
@@ -673,6 +814,7 @@ export function makeToolBox(leds, comm) {
                 }
                 toolbox[toolName].div.style.backgroundImage = 'url("include/' + toolDef.icon + '-solid.svg")'
                 _currentTool = toolName
+                showHideCanvas("")
                 createToolbarForCurrentTool()
                 toolDef.startTool()
             })

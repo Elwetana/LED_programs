@@ -633,9 +633,8 @@ function makeLedManager(canvas) {
         transmitState()
     }
 
-    manager.getStateBase64 = () => {
-        const binString = String.fromCodePoint(..._currentState);
-        return btoa(binString)
+    manager.getState = () => {
+        return saveState()
     }
 
     manager.loadFromState = function(state) {
@@ -684,7 +683,7 @@ function makeCommunicator() {
     }
 
     function sendToServer({ action='set', folder='', fileName='', state=null,
-                            mode=0, speed=0, callback=(x)=>{} } = {}) {
+                            mode=0, speed=0, position=0, callback=(x)=>{} } = {}) {
         if(!isLive && action === "set")
             return
 
@@ -710,6 +709,21 @@ function makeCommunicator() {
                 break
             case "anim":
                 msg = "/msg/anim?" + mode + "=" + speed
+                break
+            case "kfAdd":
+                msg = "/kf?command=add&state=" + btoa(String.fromCodePoint(...state))
+                break
+            case "kfTime":
+                msg = "kf?command=time&position=" + position + "&time=" + speed
+                break
+            case "kfDelete":
+                msg = "kf?command=del&position=" + position
+                break
+            case "kfUpdate":
+                msg = "kf?command=update&position=" + position + "&state=" + btoa(String.fromCodePoint(...state))
+                break
+            case "kfSwap":
+                msg = "kf?command=swap&from=" + position + "&to=" + mode
                 break
             default:
                 console.log("Unknown action " + action)
@@ -791,13 +805,220 @@ function makeCommunicator() {
         setFolderName: (s) => { folderName = s; localStorage.setItem("folder", s); console.log(s) },
         loadSaves: (folder, callback) => { sendToServer({ action: "load", folder, callback }) },
         loadCurrentState: () => { sendToServer({action: "get", callback: updateLeds})},
-        setAnimation: (mode, speed) => { sendToServer({action: "anim", mode, speed}) }
+        setAnimation: (mode, speed) => { sendToServer({action: "anim", mode, speed}) },
+
+        addKeyframe: (state, callback) => { sendToServer({
+            action: "kfAdd",
+            state,
+            callback
+        }) },
+        updateKeyframe: (position, state, callback) => { sendToServer({
+            action: "kfUpdate",
+            position,
+            state,
+            callback
+        }) },
+        updateTiming: (position, timing, callback) => { sendToServer({
+            action: "kfTime",
+            speed: timing,
+            position,
+            callback
+        }) },
+        deleteKeyframe: (position, callback) => { sendToServer({
+            action: "kfDelete",
+            position,
+            callback
+        })},
+        swapFrames: (fromPosition, toPosition, callback) => { sendToServer({
+            action: "kfSwap",
+            position: fromPosition,
+            mode: toPosition,
+            callback
+        })}
+
     }
     return comm
 }
 
+
+/**
+ * Unused and unfinished, TODO finish or delete
+ * @param comm Communicator instance
+ * @return {{fetchSaves: *}}
+ */
+function saveLoadManager(comm) {
+    return {
+        getFolder: () => {
+
+        },
+
+
+        /**
+         * Get save files in folder
+         * @param folder
+         */
+        fetchSaves: (folder) => {
+            comm.loadSaves(folder, (data) => {
+                for(const otherFolder of data.folders) {
+                    const folderDiv = document.createElement("div")
+                    folderDiv.textContent = otherFolder
+                    savefoldersDiv.appendChild(folderDiv)
+                    folderDiv.addEventListener("pointerdown", (ev) => {
+                        fetchSaves(otherFolder)
+                    })
+                }
+            })
+        }
+    }
+}
+
+
+function makeKeyframeManager() {
+    const KF_THUMB_WIDTH = 11
+    const KF_THUMB_HEIGHT = 21
+
+    /** @type {[Uint8Array]} */
+    const keyframes = []
+    /** @type {[number]} */
+    const timings = []
+    /** @type {function|null} */
+    let uiUpdater = null
+
+    function updateKeyframeFromServer(data) {
+        keyframes.splice(0)
+        for(let kf of data.keyframes) {
+            let binString = atob(kf)
+            keyframes.push(Uint8Array.from(binString, (m) => m.codePointAt(0)))
+        }
+        timings.splice(0, timings.length, ...data.frame_times)
+    }
+
+    function updateCallback(data) {
+        updateKeyframeFromServer(data)
+        if(uiUpdater)
+            uiUpdater()
+    }
+
+    return {
+        registerUIUpdater: (updateUI) => {
+            uiUpdater = updateUI
+        },
+
+        /**
+         * @param state {Uint8Array}
+         */
+        addKeyFrame: (state) => {
+            comm.addKeyframe(state, updateCallback)
+        },
+
+        /**
+         * @param keyFrameIndex {int}
+         * @param state {Uint8Array}
+         */
+        updateKeyframe: (keyFrameIndex, state) => {
+            comm.updateKeyframe(keyFrameIndex, state, updateCallback)
+        },
+
+        /**
+         * @param keyFrameIndex {int}
+         * @param timing {int}
+         */
+        updateTiming: (keyFrameIndex, timing) => {
+            comm.updateTiming(keyFrameIndex, timing, updateCallback)
+        },
+
+        /**
+         * @param keyFrameIndex {int}
+         */
+        deleteKeyframe: (keyFrameIndex) => {
+            comm.deleteKeyframe(keyFrameIndex, updateCallback)
+        },
+
+        /**
+         * Swaps the frame at the keyFrameIndex with the one before it
+         * @param keyFrameIndex {number}
+         */
+        swapKeyframe: (keyFrameIndex) => {
+            let toPos = keyFrameIndex
+            let fromPos = toPos - 1
+            if(fromPos < 0)
+                fromPos = keyframes.length - 1
+            comm.swapFrames(fromPos, toPos, updateCallback)
+        },
+
+        getKeyframesCount: () => {
+            return keyframes.length;
+        },
+
+        getKeyframe: (keyFrameIndex) => {
+            if(keyFrameIndex < keyframes.length && keyFrameIndex >= 0)
+                return keyframes[keyFrameIndex]
+            return new Uint8Array(ledsManger.n_leds())
+        },
+
+        getTiming: (keyFrameIndex) => {
+            if(keyFrameIndex < keyframes.length && keyFrameIndex >= 0)
+                return timings[keyFrameIndex]
+            return 0
+        },
+
+        /**
+         * The thumbnail has the form:
+         *  |.  .  .  .  .  1  2  3  4  5 |
+         *  |14 13 12 11 10 9  8  7  6  5 |
+         *  |14 15 16 17 18 19 20 21 22 23| etc.
+         * @param parentDiv {HTMLDivElement}
+         * @param keyFrameIndex {int}
+         */
+        renderThumbnail: (parentDiv, keyFrameIndex) => {
+            if(keyFrameIndex < 0 || keyFrameIndex >= keyframes.length) {
+                console.log("ERROR - invalid keyframe index in renderThumbnail")
+                return
+            }
+            const state = keyframes[keyFrameIndex]
+            const thumbnailCanvas = document.createElement('canvas')
+            thumbnailCanvas.width = KF_THUMB_WIDTH
+            thumbnailCanvas.height = KF_THUMB_HEIGHT
+            parentDiv.appendChild(thumbnailCanvas)
+            const ctx = thumbnailCanvas.getContext('2d')
+            let imageData = ctx.createImageData(KF_THUMB_WIDTH, KF_THUMB_HEIGHT)
+            let i = 0
+            let x = Math.trunc(KF_THUMB_WIDTH / 2)
+            let y = 0
+            let inc = 1
+            while (i < state.length) {
+                let j = 4 * (y * KF_THUMB_WIDTH + x)
+                imageData.data[j]     = state[i]     // Red
+                imageData.data[j + 1] = state[i + 1] // Green
+                imageData.data[j + 2] = state[i + 2] // Blue
+                imageData.data[j + 3] = 255          // Alpha (fully opaque)
+                x += inc
+                i += 3
+                if (x === KF_THUMB_WIDTH) {
+                    y += 1
+                    inc = -1
+                    x = KF_THUMB_WIDTH - 1
+                    i -= 3
+                }
+                if (x < 0) {
+                    y += 1
+                    inc = +1
+                    x = 0
+                    i -= 3
+                }
+                if (y === KF_THUMB_HEIGHT) {
+                    console.log("ERROR -- thumbnail too small")
+                    break
+                }
+            }
+            ctx.putImageData(imageData, 0, 0);
+        }
+    }
+}
+
 const comm = makeCommunicator()
 const ledsManger = makeLedManager(document.getElementById("treeCanvas"))
+const keyframeManager = makeKeyframeManager()
 
 
 /*
@@ -920,7 +1141,7 @@ function testLedMovement() {
 //*/
 
 function start() {
-    const toolbox = makeToolBox(ledsManger, comm)
+    const toolbox = makeToolBox(ledsManger, comm, keyframeManager)
     document.getElementById("save_folder").addEventListener("change", (ev) => {
         comm.setFolderName(ev.target.value)
     }) 
