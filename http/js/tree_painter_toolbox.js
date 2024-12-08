@@ -39,9 +39,10 @@ export function makeToolBox(leds, comm, keyframes) {
      * @param attributes {Record<string,string>}
      * @return {HTMLAnchorElement | HTMLElement | HTMLAreaElement | HTMLAudioElement | HTMLBaseElement | HTMLQuoteElement | HTMLBodyElement | HTMLBRElement | HTMLButtonElement | HTMLCanvasElement | HTMLTableCaptionElement | HTMLTableColElement | HTMLDataElement | HTMLDataListElement | HTMLModElement | HTMLDetailsElement | HTMLDialogElement | HTMLDivElement | HTMLDListElement | HTMLEmbedElement | HTMLFieldSetElement | HTMLFormElement | HTMLHeadingElement | HTMLHeadElement | HTMLHRElement | HTMLHtmlElement | HTMLIFrameElement | HTMLImageElement | HTMLInputElement | HTMLLabelElement | HTMLLegendElement | HTMLLIElement | HTMLLinkElement | HTMLMapElement | HTMLMenuElement | HTMLMetaElement | HTMLMeterElement | HTMLObjectElement | HTMLOListElement | HTMLOptGroupElement | HTMLOptionElement | HTMLOutputElement | HTMLParagraphElement | HTMLPictureElement | HTMLPreElement | HTMLProgressElement | HTMLScriptElement | HTMLSelectElement | HTMLSlotElement | HTMLSourceElement | HTMLSpanElement | HTMLStyleElement | HTMLTableElement | HTMLTableSectionElement | HTMLTableCellElement | HTMLTemplateElement | HTMLTextAreaElement | HTMLTimeElement | HTMLTitleElement | HTMLTableRowElement | HTMLTrackElement | HTMLUListElement | HTMLVideoElement}
      */
-    function createElement(tagName, parent, className, attributes={}) {
+    function createElement(tagName, parent, className="", attributes={}) {
         let e= document.createElement(tagName)
-        e.classList.add(className)
+        if(className !== "")
+            e.classList.add(className)
         parent.appendChild(e)
         for(let att in attributes) {
             e.setAttribute(att, attributes[att])
@@ -333,8 +334,8 @@ export function makeToolBox(leds, comm, keyframes) {
          * @param duration {number}
          * @return {string}
          */
-        const durationToString = (duration) => duration.toLocaleString("en-US", {
-            style: "unit", unit: "millisecond", unitDisplay: "short", maximumFractionDigits: 0})
+        const durationToString = (duration) => (duration / 1000).toLocaleString("en-US", {
+            style: "unit", unit: "second", unitDisplay: "narrow", maximumFractionDigits: 0})
 
         /**
          * Create common frame UI: slider, move up/down, delete
@@ -367,24 +368,22 @@ export function makeToolBox(leds, comm, keyframes) {
             //Add buttons
             const buttons = {
                 keyframe_load_delete: {
-                    keyframe_load: (event) => {
+                    keyframe_update: (event) => {
                         const state = keyframes.getKeyframe(n)
                         leds.loadFromState(state)
+                        //TODO save frame index for update
                         showHideCanvas("")
                     },
                     keyframe_delete: (event) => {
                         keyframes.deleteKeyframe(n)
-                        //showKeyframeUI()
                     }
                 },
                 keyframe_up_down: {
                     keyframe_up: (event) => {
                         keyframes.swapKeyframe(n)
-                        //showKeyframeUI()
                     },
                     keyframe_down: (event) => {
                         keyframes.swapKeyframe(n + 1)
-                        //showKeyframeUI()
                     }
                 }
             }
@@ -397,22 +396,43 @@ export function makeToolBox(leds, comm, keyframes) {
             }
         }
 
+        function makeTimeline() {
+            const nFrames = keyframes.getKeyframesCount()
+            const timelineDiv = createDiv(kfDiv, "keyframe_timeline")
+            for(let i = 0; i < nFrames; i++) {
+                const frameDiv = createDiv(timelineDiv, "keyframe_item")
+                const thumbnailDiv = createDiv(frameDiv, "keyframe_thumb")
+                keyframes.renderThumbnail(thumbnailDiv, i)
+                makeKeyframeControls(frameDiv, i, keyframes.getTiming(i))
+            }
+            if(nFrames > 0) {
+                const upButtons = timelineDiv.getElementsByClassName("keyframe_up")
+                upButtons.item(0).style.visibility = "hidden"
+                const downButtons = timelineDiv.getElementsByClassName("keyframe_down")
+                downButtons.item(upButtons.length - 1).style.visibility = "hidden"
+            }
+        }
+
+        function makeSaveLoadControls() {
+            const saveLoadDiv= createDiv(kfDiv, "keyframe_saveLoad")
+            const loadDiv = createDiv(saveLoadDiv, "keyframe_load")
+            const saveList = createDiv(loadDiv, "keyframe_saveList")
+            for(let s of keyframes.getSavesList()) {
+                const p = createElement("p", saveList, "")
+                p.innerText = s
+                p.addEventListener("pointerdown", () => keyframes.loadSave(s))
+            }
+            const saveDiv = createDiv(saveLoadDiv, "keyframe_save")
+            const loadButton = createElement("input", saveDiv, "keyframe_load", {type: "button"})
+            loadButton.addEventListener("pointerdown", () => keyframes.querySaves())
+            const saveButton = createElement("input", saveDiv, "keyframe_save", {type: "button"})
+            saveButton.addEventListener("pointerdown", () => keyframes.saveCurrent())
+        }
+
         const kfDiv = document.getElementById("keyframe")
         kfDiv.innerHTML = ""
-        const nFrames = keyframes.getKeyframesCount()
-        console.log("Keyframes " + nFrames)
-        for(let i = 0; i < nFrames; i++) {
-            const frameDiv = createDiv(kfDiv, "keyframe_item")
-            const thumbnailDiv = createDiv(frameDiv, "keyframe_thumb")
-            keyframes.renderThumbnail(thumbnailDiv, i)
-            makeKeyframeControls(frameDiv, i, keyframes.getTiming(i))
-        }
-        if(nFrames > 0) {
-            const upButtons = kfDiv.getElementsByClassName("keyframe_up")
-            upButtons.item(0).style.visibility = "hidden"
-            const downButtons = kfDiv.getElementsByClassName("keyframe_down")
-            downButtons.item(upButtons.length - 1).style.visibility = "hidden"
-        }
+        makeTimeline()
+        makeSaveLoadControls()
         showHideCanvas("addKeyframe")
     }
 

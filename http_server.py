@@ -1,6 +1,7 @@
 #!/usr/bin/python
 import base64
 import random
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import socket
 import argparse
@@ -176,6 +177,61 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
         logger.error("Invalid parameter for command %s" % qq["command"])
         return ""
 
+    def save_keyframes(self, qq: Dict) -> bool:
+        """
+        Save current keyframes if the client is up-to-date
+        :param qq: parsed query parameters
+        :return: True if the last update was from the same client, False otherwise
+        """
+        if self.server.kf_state["last_client"] != self.client_address[0]:
+            return False
+        save_folder = "saves/%s" % qq["folder"]
+        if not os.path.exists(save_folder) or not os.path.isdir(save_folder):
+            if os.path.exists(save_folder) and not os.path.isdir(save_folder):
+                os.remove(save_folder)
+            os.mkdir(save_folder)
+        # save name = "<frame count>fr_<total time>s_<random save name>
+        save_name = "%sfr_%ss-%s" % (len(self.server.kf_state["keyframes"]),
+                                     round(sum(self.server.kf_state["frame_times"]) / 1000, 0),
+                                     random.choice(list(LEDHttpHandler.save_names.keys())))
+        with open(os.path.join(save_folder, save_name + ".json"), "w") as f:
+            json.dump(self.server.kf_state, f)
+        # self.wfile.write(json.dumps({"result": "ok", "filename": save_name}).encode())
+        self.list_keyframe_saves(qq)
+        return True
+
+    def load_keyframes(self, qq):
+        save_folder = "saves/%s" % qq["folder"]
+        save_name = qq["file"]
+        path = os.path.join("saves/%s" % qq["folder"], qq["file"] + ".json")
+        if not os.path.exists(path):
+            return False
+        n_old_frames = len(self.server.kf_state["keyframes"])
+        with open(os.path.join(save_folder, save_name + ".json"), "r") as f:
+            self.server.kf_state = json.load(f)
+        for i in range(n_old_frames):
+            self.server.broadcaster.send_string("LED MSG del?0")
+        i = 0
+        for state in self.server.kf_state["keyframes"]:
+            self.server.broadcaster.send_string("LED MSG add?%s" % state)
+            self.server.broadcaster.send_string("LED MSG time?%s&%s" % (i, self.server.kf_state["frame_times"][i]))
+            i += 1
+        logger.info("Send %s + %i ZMQ messages" % (n_old_frames, 2 * i))
+        return True
+
+    def list_keyframe_saves(self, qq):
+        save_folder = "saves/%s" % qq["folder"]
+        saves = []
+        if os.path.exists(save_folder) and os.path.isdir(save_folder):
+            all_stuff = os.listdir(save_folder)
+            for stuff in all_stuff:
+                file_name = os.path.join(save_folder, stuff)
+                if os.path.isfile(file_name):
+                    name, ext = os.path.splitext(stuff)
+                    if ext == ".json":
+                        saves.append(name)
+        self.wfile.write(json.dumps({"result": "ok", "names": saves}).encode())
+
     def serve_keyframes(self):
         if self.server.state["source"] != "paint":
             self.wfile.write(json.dumps({"result": "error", "error": "Not in the paint mode"}).encode())
@@ -185,12 +241,19 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
             logger.error("Invalid keyframe message %s" % self.path)
             self.wfile.write(json.dumps({"result": "error", "error": "Invalid request"}).encode())
             return
-
-        msg = self.keyframes_process_command(qq)
-
-        if msg != "":
-            self.server.broadcaster.send_string(msg)
-            logger.info("ZMQ message sent: %s" % msg)
+        if qq["command"] == "save":
+            if self.save_keyframes(qq):
+                return
+        elif qq["command"] == "load":
+            self.load_keyframes(qq)
+        elif qq["command"] == "list":
+            self.list_keyframe_saves(qq)
+            return
+        else:
+            msg = self.keyframes_process_command(qq)
+            if msg != "":
+                self.server.broadcaster.send_string(msg)
+                logger.info("ZMQ message sent: %s" % msg)
         self.server.kf_state["last_client"] = self.client_address[0]
         self.wfile.write(json.dumps({
             "result": "ok",
@@ -274,7 +337,13 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
         LEDHttpHandler.save_state_as_png(state, os.path.join(save_folder, save_name + ".png"))
         self.wfile.write('{"result":"ok"}'.encode())
 
-    def load_saves(self, folder_name):
+    def load_saves(self, folder_name: str):
+        """
+        Loads oll png files in folder_name. Writes to output list of saved files
+        and their names and list of other folders in /saves directory
+        :param folder_name:
+        :return:
+        """
         result: SaveInfo = {"saves": {}, "folders": [], "result": ""}
         save_folder = "saves/%s" % folder_name
         if os.path.exists(save_folder) and os.path.isdir(save_folder):
@@ -282,9 +351,10 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
             for stuff in all_stuff:
                 file_name = os.path.join(save_folder, stuff)
                 if os.path.isfile(file_name):
-                    base64_state = LEDHttpHandler.load_state_from_png(file_name)
                     name, ext = os.path.splitext(file_name)
-                    result["saves"][name] = base64_state
+                    if ext == ".png":
+                        base64_state = LEDHttpHandler.load_state_from_png(file_name)
+                        result["saves"][name] = base64_state
         for stuff in os.listdir("saves/"):
             if os.path.isdir(os.path.join("saves/", stuff)):
                 result["folders"].append(stuff)

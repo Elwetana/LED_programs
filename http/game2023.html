@@ -47,16 +47,25 @@
             div#tools {
                 max-width: 320px;
             }
+            div#keyframe {
+                max-width: 320px;
+            }
         }
 
         @media screen and (min-resolution: 192dpi) {
             div#tools {
                 max-width: 480px;
             }
+            div#keyframe {
+                max-width: 480px;
+            }
         }
 
         @media screen and (min-resolution: 240dpi) {
             div#tools {
+                max-width: 640px;
+            }
+            div#keyframe {
                 max-width: 640px;
             }
         }
@@ -145,11 +154,19 @@
             background-color: aliceblue;
         }
 
+        div.keyframe_timeline {
+            background-color: lightsteelblue;
+            padding: 1px 7px;
+        }
+
         div.keyframe_item {
-            height: 60px;
+            height: 64px;
             display: flex;
             flex-direction: row;
             align-items: center;
+            margin: 7px 0;
+            background-color: white;
+            padding: 5px;
         }
 
         div.keyframe_thumb {
@@ -164,6 +181,7 @@
         div.keyframe_controls {
             display: flex;
             align-items: center;
+            width: 100%;
         }
 
         div.keyframe_controls div {
@@ -173,12 +191,12 @@
 
         div.keyframe_controls label {
             display: block;
-            width: 5vw;
+            width: 15%;
             text-align: right;
         }
 
         input.keyframe_duration {
-
+            width: 60%;
         }
 
         div.keyframe_load_delete {
@@ -191,9 +209,10 @@
             background-repeat: no-repeat;
             aspect-ratio: 1/1;
             border: none;
+            background-color: transparent;
         }
 
-        input.keyframe_load {
+        input.keyframe_update {
             background-image: url("include/open-outline.svg");
         }
 
@@ -211,6 +230,54 @@
 
         input.keyframe_down {
             background-image: url("include/caret-down-outline.svg");
+        }
+
+        div.keyframe_saveLoad {
+            background-color: white;
+        }
+
+        div.keyframe_load {
+
+        }
+
+        div.keyframe_saveList {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-around;
+        }
+
+        div.keyframe_saveList p {
+            margin: 5px;
+            padding: 5px;
+            text-align: center;
+            font-family: Verdana, Arial, Helvetica, sans-serif;
+            width: 40%;
+            border: 1px solid black;
+            background-color: lightgrey;
+        }
+
+        div.keyframe_save {
+            display: flex;
+            justify-content: space-around;
+        }
+
+        div.keyframe_saveLoad input {
+            background-repeat: no-repeat;
+            aspect-ratio: 1/1;
+            width: 20%;
+            border: none;
+            background-color: transparent;
+            background-position: center;
+        }
+
+        input.keyframe_load {
+            background-image: url("include/open-folder-line.svg");
+            background-size: 90%;
+        }
+
+        input.keyframe_save {
+            background-image: url("include/floppy-disk-line.svg");
+            background-size: 80%;
         }
 
 
@@ -243,19 +310,33 @@
         </div>
         <div id="help" style="display: none"></div>
         <div id="keyframe" style="display: none">
-            <div class="keyframe_item">
-                <div class="keyframe_thumb"></div>
-                <div class="keyframe_controls">
-                    <label for="keyframe_duration_01">100</label>
-                    <input id="keyframe_duration_01" type="range" class="keyframe_duration" min="0" max="100" step="any">
-                    <div class="keyframe_load_delete">
-                        <input type="button" class="keyframe_load">
-                        <input type="button" class="keyframe_delete">
+            <div class="keyframe_timeline">
+                <div class="keyframe_item">
+                    <div class="keyframe_thumb"></div>
+                    <div class="keyframe_controls">
+                        <label for="keyframe_duration_01">100</label>
+                        <input id="keyframe_duration_01" type="range" class="keyframe_duration" min="0" max="100" step="any">
+                        <div class="keyframe_load_delete">
+                            <input type="button" class="keyframe_update">
+                            <input type="button" class="keyframe_delete">
+                        </div>
+                        <div class="keyframe_up_down">
+                            <input type="button" class="keyframe_up">
+                            <input type="button" class="keyframe_down">
+                        </div>
                     </div>
-                    <div class="keyframe_up_down">
-                        <input type="button" class="keyframe_up">
-                        <input type="button" class="keyframe_down">
+                </div>
+            </div>
+            <div class="keyframe_saveLoad">
+                <div class="keyframe_load">
+                    <div class="keyframe_saveList">
+                        <p>save name 1</p>
+                        <p>save name 1</p>
                     </div>
+                    <input type="button">
+                </div>
+                <div class="keyframe_save">
+                    <input type="button">
                 </div>
             </div>
         </div>

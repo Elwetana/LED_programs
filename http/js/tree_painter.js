@@ -9,7 +9,6 @@ TODO:
 [x] Globally adjust saturation, lightness
 [x] Preview mode for global adjustment
 [x] Other chain display configurations
-[-] Timeline and Keyframes
 [x] Animation modes
 [x] Undo/Redo
 [x] Communication with server
@@ -27,11 +26,20 @@ Bugs:
 [ ] split ledManager and communicator to separate modules
 [ ] undo should transmit state
 [x] allow load from other folders
+Timeline and Keyframes (Xmas 2024):
+[x] Add keyframe
+[ ] Update keyframe
+[x] Change keyframe order
+[x] Change keyframe duration
+[ ] CSS based animations when moving keyframes
+[ ] Save and Load keyframes
+[ ] Decouple saving from toolbox (for normal saves)
+
 */
 
 import './iro.min.js'
 import { makeToolBox } from './tree_painter_toolbox.js'
-import { makeHSL, makePoint } from './tree_painter_utils.js'
+import { makeHSL, makePoint, stateToImageData } from './tree_painter_utils.js'
 document.addEventListener('DOMContentLoaded', start)
 
 /* LED chain */
@@ -702,10 +710,10 @@ function makeCommunicator() {
                 msg = "/save?save_as&folder=" + folder + "&name=" + fileName + "&state=" + btoa(String.fromCodePoint(...state))
                 break
             case "names":
-                msg = "/save?get_names&folder=" +folder
+                msg = "/save?get_names&folder=" + folder
                 break
             case "load":
-                msg = "/save?load&folder=" +folder
+                msg = "/save?load&folder=" + folder
                 break
             case "anim":
                 msg = "/msg/anim?" + mode + "=" + speed
@@ -724,6 +732,15 @@ function makeCommunicator() {
                 break
             case "kfSwap":
                 msg = "kf?command=swap&from=" + position + "&to=" + mode
+                break
+            case "kfSave":
+                msg = "kf?command=save&folder=" + folderName
+                break
+            case "kfLoad":
+                msg = "kf?command=load&folder=" + folderName + "&file=" + fileName
+                break
+            case "kfList":
+                msg = "kf?command=list&folder=" + folderName
                 break
             default:
                 console.log("Unknown action " + action)
@@ -834,9 +851,24 @@ function makeCommunicator() {
             position: fromPosition,
             mode: toPosition,
             callback
+        })},
+        // Server actually has its own, authoritative, copy of keyframes and timings, we don't need to send them
+        saveFrames: (callback) => { sendToServer({
+            action: "kfSave",
+            callback
+        })},
+        loadFrames: (fileName, callback) => { sendToServer({
+            action: "kfLoad",
+            fileName,
+            callback
+        })},
+        listFrameSaves: (callback) => { sendToServer({
+            action: "kfList",
+            callback
         })}
 
     }
+    loadLocally()
     return comm
 }
 
@@ -846,11 +878,17 @@ function makeCommunicator() {
  * @param comm Communicator instance
  * @return {{fetchSaves: *}}
  */
-function saveLoadManager(comm) {
+function saveLoadManager() {
     return {
-        getFolder: () => {
-
+        saveKeyframes: () => {
+            //keyframeManager.
         },
+
+
+        getFolder: () => {
+            return comm.getFolderName()
+        },
+
 
 
         /**
@@ -881,10 +919,18 @@ function makeKeyframeManager() {
     const keyframes = []
     /** @type {[number]} */
     const timings = []
+    /** @type {[string]} */
+    const saves = []
     /** @type {function|null} */
     let uiUpdater = null
 
+    /**
+     * Recreate keyframes and their timings from the data returned from server
+     * @param data {{result: string, keyframes: [string], frame_times: [number]}}
+     */
     function updateKeyframeFromServer(data) {
+        if(!data.hasOwnProperty("keyframes"))
+            return
         keyframes.splice(0)
         for(let kf of data.keyframes) {
             let binString = atob(kf)
@@ -899,7 +945,23 @@ function makeKeyframeManager() {
             uiUpdater()
     }
 
+    /**
+     * Store list of save file names from server
+     * @param data {{result: string, names: [string]}}
+     */
+    function updateSaveList(data) {
+        console.log("Updating save list")
+        if(!data.hasOwnProperty("names"))
+            return
+        saves.splice(0, saves.length, ...data.names)
+        if(uiUpdater)
+            uiUpdater()
+    }
+
     return {
+        /**
+         * @param updateUI {function}
+         */
         registerUIUpdater: (updateUI) => {
             uiUpdater = updateUI
         },
@@ -962,6 +1024,22 @@ function makeKeyframeManager() {
             return 0
         },
 
+        getSavesList: () => {
+            return [...saves]
+        },
+
+        saveCurrent: () => {
+            comm.saveFrames(updateSaveList)
+        },
+
+        loadSave: (fileName) => {
+            comm.loadFrames(fileName, updateCallback)
+        },
+
+        querySaves: () => {
+            comm.listFrameSaves(updateSaveList)
+        },
+
         /**
          * The thumbnail has the form:
          *  |.  .  .  .  .  1  2  3  4  5 |
@@ -988,10 +1066,7 @@ function makeKeyframeManager() {
             let inc = 1
             while (i < state.length) {
                 let j = 4 * (y * KF_THUMB_WIDTH + x)
-                imageData.data[j]     = state[i]     // Red
-                imageData.data[j + 1] = state[i + 1] // Green
-                imageData.data[j + 2] = state[i + 2] // Blue
-                imageData.data[j + 3] = 255          // Alpha (fully opaque)
+                stateToImageData(imageData, state, j, i)
                 x += inc
                 i += 3
                 if (x === KF_THUMB_WIDTH) {

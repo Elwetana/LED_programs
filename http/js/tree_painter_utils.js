@@ -179,3 +179,17 @@ export function makeHSL(h, s, l) {
 
     return hsl
 }
+
+/**
+ * Fill one pixel in imageData with values from state
+ * @param imageData {ImageData}
+ * @param state {Uint8Array}
+ * @param idIndex {number}
+ * @param stateIndex {number}
+ */
+export function stateToImageData(imageData, state, idIndex, stateIndex) {
+    imageData.data[idIndex + 0] = state[stateIndex + 0] // Red
+    imageData.data[idIndex + 1] = state[stateIndex + 1] // Green
+    imageData.data[idIndex + 2] = state[stateIndex + 2] // Blue
+    imageData.data[idIndex + 3] = 255                   // Alpha (fully opaque)
+}
