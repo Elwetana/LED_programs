@@ -190,7 +190,7 @@ export function makeToolBox(leds, comm, keyframes) {
             icon: "anim",
             startTool: () => {},
             endTool: () => {},
-            toolbar: ["noAnim", "moveAnim", "aaMoveAnim", "shimmerAnim", "moveShimmerAnim", "addKeyframe"],
+            toolbar: ["noAnim", "moveAnim", "aaMoveAnim", "shimmerAnim", "moveShimmerAnim", "addKeyframe", "editKeyframe"],
             div: null,
             help: "Opens menu where you can select global animation mode and speed"
         },
@@ -334,8 +334,9 @@ export function makeToolBox(leds, comm, keyframes) {
          * @param duration {number}
          * @return {string}
          */
-        const durationToString = (duration) => (duration / 1000).toLocaleString("en-US", {
-            style: "unit", unit: "second", unitDisplay: "narrow", maximumFractionDigits: 0})
+        const durationToString = (duration) => duration > 1000 ?
+            (duration / 1000).toLocaleString("en-US", {style: "unit", unit: "second", unitDisplay: "narrow", maximumFractionDigits: 1}) :
+            (duration).toLocaleString("en-US", {style: "unit", unit: "millisecond", unitDisplay: "narrow", maximumFractionDigits: 0})
 
         /**
          * Create common frame UI: slider, move up/down, delete
@@ -371,7 +372,7 @@ export function makeToolBox(leds, comm, keyframes) {
                     keyframe_update: (event) => {
                         const state = keyframes.getKeyframe(n)
                         leds.loadFromState(state)
-                        //TODO save frame index for update
+                        toolbar.editKeyframe.setMode("update", n)
                         showHideCanvas("")
                     },
                     keyframe_delete: (event) => {
@@ -603,11 +604,44 @@ export function makeToolBox(leds, comm, keyframes) {
         addKeyframe: {
             icon: "anim-add-frame",
             action: () => {
-                keyframes.addKeyFrame(leds.getState(), showKeyframeUI)
-                //keyframes.updateTiming(i, 100)
+                keyframes.addKeyFrame(leds.getState())
             },
             div: null,
             help: "Add new keyframe to animation"
+        },
+        editKeyframe: {
+            icon: "anim-keyframes",
+            mode: "edit",
+            updateIndex: -1,
+            setMode: (m, i=-1) => {
+                switch (m) {
+                    case "edit":
+                        toolbar.editKeyframe.icon = "anim-keyframes"
+                        break
+                    case "update":
+                        toolbar.editKeyframe.icon = "anim-update-frame"
+                        break
+                    default:
+                        console.log("Unknown keyframe mode")
+                }
+                toolbar.editKeyframe.updateIndex = i
+                toolbar.editKeyframe.mode = m
+            },
+            action: () => {
+                switch(toolbar.editKeyframe.mode) {
+                    case "edit":
+                        keyframes.openKeyframe()
+                        break
+                    case "update":
+                        keyframes.updateKeyframe(toolbar.editKeyframe.updateIndex, leds.getState())
+                        toolbar.editKeyframe.setMode("edit")
+                        break;
+                    default:
+                        console.log("Unknown keyframe mode action")
+                }
+            },
+            div: null,
+            help: "View and edit timeline or update the current frame"
         },
         ledPlacement: {
             icon: "led-position",
@@ -773,7 +807,8 @@ export function makeToolBox(leds, comm, keyframes) {
     const canvasHidingButtons = {
         showHelp: 'help',
         save: 'save',
-        addKeyframe: 'keyframe'
+        addKeyframe: 'keyframe',
+        editKeyframe: 'keyframe'
     }
     function showHideCanvas(button) {
         if(button in canvasHidingButtons) {

@@ -742,6 +742,9 @@ function makeCommunicator() {
             case "kfList":
                 msg = "kf?command=list&folder=" + folderName
                 break
+            case "kfGet":
+                msg = "kf?command=get"
+                break
             default:
                 console.log("Unknown action " + action)
                 return
@@ -865,6 +868,10 @@ function makeCommunicator() {
         listFrameSaves: (callback) => { sendToServer({
             action: "kfList",
             callback
+        })},
+        getFrames: (callback) => { sendToServer({
+            action: "kfGet",
+            callback
         })}
 
     }
@@ -979,6 +986,13 @@ function makeKeyframeManager() {
          */
         updateKeyframe: (keyFrameIndex, state) => {
             comm.updateKeyframe(keyFrameIndex, state, updateCallback)
+        },
+
+        /**
+         * Retrieves the current state of keyframes from server
+         */
+        openKeyframe: () => {
+            comm.getFrames(updateCallback)
         },
 
         /**

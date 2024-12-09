@@ -131,6 +131,7 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
         kf?command=update&position=<pos>&state=<base 64 encoded>
         kf?command=time&position=<pos>&time=<int timing>
         kf?command=swap&from=<pos1>&to=<pos2>
+        kf?command=get
 
         :return: message to send to server
         """
@@ -171,6 +172,8 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
                 self.server.kf_state["frame_times"][to_position] = self.server.kf_state["frame_times"][from_position]
                 self.server.kf_state["frame_times"][from_position] = tmp2
                 return "LED MSG swap?%s&%s" % (from_position, to_position)
+        elif qq["command"] == "get":
+            return ""
         else:
             logger.error("Unknown command for keyframes %s" % qq["command"])
             return ""
@@ -245,7 +248,7 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
             if self.save_keyframes(qq):
                 return
         elif qq["command"] == "load":
-            self.load_keyframes(qq)
+            self.load_keyframes(qq)  # this overwrites self.server.kf_state, which is then returned at the end of this function
         elif qq["command"] == "list":
             self.list_keyframe_saves(qq)
             return
