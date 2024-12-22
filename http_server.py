@@ -1,7 +1,7 @@
 #!/usr/bin/python
 import base64
 import random
-import time
+from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import socket
 import argparse
@@ -15,16 +15,278 @@ import zmq
 from typing import Dict, List, Union, TypedDict
 
 from PIL import Image as pillowImg
+import numpy as np
+from scipy.stats import entropy
+from colorsys import hls_to_rgb
 
 logger = logging.getLogger(__name__)
 N_LEDS = 200
 N_THUMB_SIZE = 16
 
 
-class KeyFrameState(TypedDict):
-    keyframes: List[str]  # base64 encoded states
-    frame_times: List[int]
+class PolybiusSquare:
+    def __init__(self, polybius, hsl_colours):
+        """
+        Initialize the Polybius square and precompute character coordinates.
+
+        Args:
+            polybius: List of lists representing the Polybius square.
+        """
+        self.polybius = polybius
+        # Precompute the coordinates for each character in the Polybius square
+        self.coordinate_map = {
+            char: (row_index, col_index)
+            for row_index, row in enumerate(polybius)
+            for col_index, char in enumerate(row)
+        }
+        self.hsl_colours = hsl_colours
+
+    def get_coordinates(self, text):
+        """
+        Find coordinates of characters in the Polybius square using the precomputed dictionary.
+
+        Args:
+            text: String to find the coordinates for.
+
+        Returns:
+            List of tuples where each tuple is the (row, column) of a character in the square.
+        """
+        # Normalize the text to uppercase
+        text = text.upper()
+
+        # Replace "CH" with a unique placeholder
+        text = text.replace("CH", "X")
+
+        # Lookup coordinates for each character in the text
+        return [self.coordinate_map[char] for char in text if char in self.coordinate_map]
+
+    def encode_to_colors(self, text, dim_factor, length):
+        """
+        Encode a string into a sequence of colors based on a Polybius square.
+
+        Args:
+            text: String to encode.
+            dim_factor: Float (0 to 1) to dim the colors (0 = black, 1 = original colors).
+            length: Integer total number of leds to return
+
+        Returns:
+            List of colors representing the encoded string with separators.
+        """
+        # Get coordinates for the input text
+        coordinates = self.get_coordinates(text)
+
+        # Create the dimmed color palette in RGB
+        dimmed_colors = []
+        for h, s, l in self.hsl_colours:
+            dimmed_lightness = l * dim_factor
+            r, g, b = hls_to_rgb(h, dimmed_lightness, s)
+            dimmed_colors.append((int(r * 255), int(g * 255), int(b * 255)))
+
+        # Dimmed white separator
+        white_hsl = (0, 0, 1)  # White in HSL
+        dimmed_white_l = 1 * dim_factor
+        dimmed_white_rgb = tuple(int(c * 255) for c in hls_to_rgb(white_hsl[0], dimmed_white_l, white_hsl[1]))
+
+        # Encode the coordinates into colors
+        result = []
+        for row, col in coordinates:
+            result.append(dimmed_colors[row])  # Row color
+            result.append(dimmed_colors[col])  # Column color
+            result.append(dimmed_white_rgb)  # Separator
+
+        # Remove the last separator
+        if result and result[-1] == dimmed_white_rgb:
+            result.pop()
+
+        # Truncate or pad the result to match the length
+        if len(result) > length:
+            result = result[:length]
+        elif len(result) < length:
+            result.extend([dimmed_white_rgb] * (length - len(result)))
+
+        # Flatten the RGB tuples into a byte array
+        flat_result = [component for rgb in result for component in rgb]
+
+        # Encode the byte array as Base64
+        return base64.b64encode(bytes(flat_result)).decode('ascii')
+
+
+class KeyFrameData:
+    keyframe: str  # base64 encoded states
+    frame_time: int
+    beauty_score: float
+    client: str
+
+    def __init__(self, keyframe, frame_time, client):
+        self.keyframe = keyframe
+        self.frame_time = frame_time
+        self.client = client
+        self.evaluate_beauty()
+
+    def update_keyframe(self, keyframe, client):
+        self.keyframe = keyframe
+        self.client = client
+        self.evaluate_beauty()
+
+    def evaluate_beauty(self, optimal_distance=0.1):
+        np_hues: np.array
+        np_saturations: np.array
+        np_lightness: np.array
+
+        def process_colors(colors):
+            hues, saturations, lightness = [], [], []
+            for r, g, b in colors:
+                r, g, b = r / 255.0, g / 255.0, b / 255.0
+                max_c, min_c = max(r, g, b), min(r, g, b)
+                delta = max_c - min_c
+                # Hue
+                if delta == 0:
+                    h = 0
+                elif max_c == r:
+                    h = (g - b) / delta % 6
+                elif max_c == g:
+                    h = (b - r) / delta + 2
+                else:
+                    h = (r - g) / delta + 4
+                h /= 6
+                # Saturation and Lightness
+                l = (max_c + min_c) / 2
+                s = delta / (1 - abs(2 * l - 1)) if delta != 0 else 0
+                hues.append(h)
+                saturations.append(s)
+                lightness.append(l)
+            return np.array(hues), np.array(saturations), np.array(lightness)
+
+        def compute_proximity_score():
+            hue_diffs = np.abs(np.diff(np_hues, append=np_hues[0]))
+            hue_diffs = np.minimum(hue_diffs, 1 - hue_diffs)
+            proximity_scores = 1 - ((hue_diffs - optimal_distance) ** 2) / (optimal_distance * (1 - optimal_distance))
+            weights = np_saturations[:-1] * np_saturations[1:]
+            if np.sum(weights) > 0:
+                return np.sum(proximity_scores[:-1] * weights) / np.sum(weights)
+            return 0
+
+        def compute_diversity_score():
+            hist, _ = np.histogram(np_hues, bins=10, range=(0, 1), density=True)
+            return entropy(hist) / np.log(len(hist))
+
+        def compute_lightness_score():
+            std = np.std(np_lightness)
+            return max(0.0, 1 - abs(std - 0.2) / 0.2)
+
+        def compute_saturation_score():
+            mean = np.mean(np_saturations)
+            return max(0.0, 1 - abs(mean - 0.6) / 0.4)
+
+        def compute_pattern_entropy():
+            hist_hue, _ = np.histogram(np_hues, bins=10, range=(0, 1), density=True)
+            hist_sat, _ = np.histogram(np_saturations, bins=10, range=(0, 1), density=True)
+            hist_light, _ = np.histogram(np_lightness, bins=10, range=(0, 1), density=True)
+            return (entropy(hist_hue) + entropy(hist_sat) + entropy(hist_light)) / (3 * np.log(10))
+
+        def decode_base64_pattern():
+            decoded_bytes = base64.b64decode(self.keyframe)
+            if len(decoded_bytes) % 3 != 0:
+                raise ValueError("The decoded bytes do not represent valid RGB values.")
+            return [(decoded_bytes[i], decoded_bytes[i + 1], decoded_bytes[i + 2]) for i in range(0, len(decoded_bytes), 3)]
+
+        np_hues, np_saturations, np_lightness = process_colors(decode_base64_pattern())
+        proximity_score = compute_proximity_score()
+        diversity_score = compute_diversity_score()
+        lightness_score = compute_lightness_score()
+        saturation_score = compute_saturation_score()
+        pattern_entropy = compute_pattern_entropy()
+
+        # print("prox %s, divers %s, light %s, satur %s, entropy %s" % (proximity_score, diversity_score, lightness_score, saturation_score, pattern_entropy))
+
+        self.beauty_score = max(0, min(1, (
+                                            0.4 * proximity_score +
+                                            0.2 * diversity_score +
+                                            0.2 * lightness_score +
+                                            0.1 * saturation_score +
+                                            0.1 * pattern_entropy
+                                )))
+
+
+class KeyFrameState:
+    kf_data: List[KeyFrameData]
     last_client: str
+    client_times: Dict[str, datetime]
+    last_beauty: float
+
+    def __init__(self):
+        self.kf_data = []
+        self.last_client = ""
+        self.client_times = {}
+        self.last_beauty = 0.0
+
+    def add_keyframe(self, keyframe, client):
+        self.kf_data.append(KeyFrameData(keyframe=keyframe, frame_time=100, client=client))
+        self.update_clients(client)
+        return True
+
+    def update_keyframe(self, position, keyframe, client):
+        if not (position < len(self.kf_data)):
+            return False
+        self.kf_data[position].update_keyframe(keyframe=keyframe, client=client)
+        self.update_clients(client)
+        return True
+
+    def update_time(self, position, time, client):
+        if not (position < len(self.kf_data)):
+            return False
+        self.kf_data[position].frame_time = time
+        self.update_clients(client)
+        return True
+
+    def delete_keyframe(self, position, client):
+        if not (position < len(self.kf_data)):
+            return False
+        del self.kf_data[position]
+        self.update_clients(client)
+        return True
+
+    def swap_keyframes(self, position_from, position_to, client):
+        if not (position_from < len(self.kf_data)):
+            return False
+        if not (position_to < len(self.kf_data)):
+            return False
+        self.kf_data[position_to], self.kf_data[position_from] = self.kf_data[position_from], self.kf_data[position_to]
+        self.update_clients(client)
+        return True
+
+    def update_clients(self, client):
+        self.last_client = client
+        self.client_times[client] = datetime.now()
+        cutoff_time = datetime.now() - timedelta(hours=1)
+        self.client_times = {client: time for client, time in self.client_times.items() if time >= cutoff_time}
+
+    def load_from_json(self, save_data, client):
+        self.kf_data = []
+        for i in range(len(save_data["keyframes"])):
+            self.kf_data.append(KeyFrameData(keyframe=save_data["keyframes"][i],
+                                             frame_time=save_data["frame_times"][i],
+                                             client=client))
+        self.update_clients(client)
+
+    def save_to_json(self, client):
+        return {
+            "keyframes": [d.keyframe for d in self.kf_data],
+            "frame_times": [d.frame_time for d in self.kf_data]
+        }
+
+    def get_total_time(self):
+        return sum([d.frame_time for d in self.kf_data])
+
+    def get_total_beauty(self) -> tuple[float, float]:
+        total_score = 0.0
+        for kf in self.kf_data:
+            # print(kf.beauty_score, kf.keyframe, kf.client)
+            total_score += kf.beauty_score
+        # result is average beauty multiplied by the number of clients (so adding new client has great impact)
+        res = (self.last_beauty, 0 if len(self.kf_data) == 0 else (total_score / len(self.kf_data)) * len(self.client_times))
+        self.last_beauty = res[1]
+        return res
 
 
 class SaveInfo(TypedDict):
@@ -39,6 +301,7 @@ class LEDHttpServerClass(ThreadingHTTPServer):
     state: Dict[str, str]
     paint_state: Dict[str, bytearray]
     kf_state: KeyFrameState
+    polybiusSquare: PolybiusSquare
 
 
 class LEDHttpHandler(BaseHTTPRequestHandler):
@@ -84,6 +347,8 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
         self.server.state["source"] = source_args[0].lower()
         if len(source_args) > 1:
             self.server.state["color"] = "#" + source_args[1]
+        if payload == "PAINT":
+            self.server.kf_state.__init__()
 
     def send_message(self):
         payload = self.path[len("/msg/"):]
@@ -135,44 +400,37 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
 
         :return: message to send to server
         """
+
+        client = self.client_address[0]
         if qq["command"] == "add":
-            self.server.kf_state["keyframes"].append(qq["state"])
-            self.server.kf_state["frame_times"].append(100)
+            self.server.kf_state.add_keyframe(keyframe=qq["state"], client=client)
             return "LED MSG add?%s" % qq["state"]
 
         # for all commands but add, client needs to be updated first if the kf data were modified
-        if self.server.kf_state["last_client"] != self.client_address[0]:
+        if self.server.kf_state.last_client != client:
+            self.server.kf_state.update_clients(client)
             return ""
 
-        n_frames = len(self.server.kf_state["keyframes"])
         if qq["command"] == "del":
             position = int(qq["position"])
-            if position < n_frames:
-                del self.server.kf_state["keyframes"][position]
+            if self.server.kf_state.delete_keyframe(position=position, client=client):
                 return "LED MSG del?%s" % position
         elif qq["command"] == "update":
             position = int(qq["position"])
-            if position < n_frames:
-                self.server.kf_state["keyframes"][position] = qq["state"]
+            if self.server.kf_state.update_keyframe(position=position, keyframe=qq["state"], client=client):
                 return "LED MSG update?%s&%s" % (position, qq["state"])
         elif qq["command"] == "time":
             position = int(qq["position"])
             timing = int(qq["time"])
-            if position < n_frames:
-                self.server.kf_state["frame_times"][position] = timing
+            if self.server.kf_state.update_time(position=position, time=timing, client=client):
                 return "LED MSG time?%s&%s" % (position, timing)
         elif qq["command"] == "swap":
             from_position = int(qq["from"])
             to_position = int(qq["to"])
-            if from_position < n_frames and to_position < n_frames:
-                tmp = self.server.kf_state["keyframes"][to_position]
-                self.server.kf_state["keyframes"][to_position] = self.server.kf_state["keyframes"][from_position]
-                self.server.kf_state["keyframes"][from_position] = tmp
-                tmp2 = self.server.kf_state["frame_times"][to_position]
-                self.server.kf_state["frame_times"][to_position] = self.server.kf_state["frame_times"][from_position]
-                self.server.kf_state["frame_times"][from_position] = tmp2
+            if self.server.kf_state.swap_keyframes(position_from=from_position, position_to=to_position, client=client):
                 return "LED MSG swap?%s&%s" % (from_position, to_position)
         elif qq["command"] == "get":
+            self.server.kf_state.update_clients(client=client)
             return ""
         else:
             logger.error("Unknown command for keyframes %s" % qq["command"])
@@ -186,7 +444,7 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
         :param qq: parsed query parameters
         :return: True if the last update was from the same client, False otherwise
         """
-        if self.server.kf_state["last_client"] != self.client_address[0]:
+        if self.server.kf_state.last_client != self.client_address[0]:
             return False
         save_folder = "saves/%s" % qq["folder"]
         if not os.path.exists(save_folder) or not os.path.isdir(save_folder):
@@ -194,12 +452,12 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
                 os.remove(save_folder)
             os.mkdir(save_folder)
         # save name = "<frame count>fr_<total time>s_<random save name>
-        save_name = "%sfr_%ss-%s" % (len(self.server.kf_state["keyframes"]),
-                                     round(sum(self.server.kf_state["frame_times"]) / 1000, 0),
+        save_name = "%sfr_%ss-%s" % (len(self.server.kf_state.kf_data),
+                                     round(self.server.kf_state.get_total_time() / 1000, 0),
                                      random.choice(list(LEDHttpHandler.save_names.keys())))
+        save_data = self.server.kf_state.save_to_json(client=self.client_address[0])
         with open(os.path.join(save_folder, save_name + ".json"), "w") as f:
-            json.dump(self.server.kf_state, f)
-        # self.wfile.write(json.dumps({"result": "ok", "filename": save_name}).encode())
+            json.dump(save_data, f)
         self.list_keyframe_saves(qq)
         return True
 
@@ -209,15 +467,16 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
         path = os.path.join("saves/%s" % qq["folder"], qq["file"] + ".json")
         if not os.path.exists(path):
             return False
-        n_old_frames = len(self.server.kf_state["keyframes"])
+        n_old_frames = len(self.server.kf_state.kf_data)
         with open(os.path.join(save_folder, save_name + ".json"), "r") as f:
-            self.server.kf_state = json.load(f)
+            save_data = json.load(f)
+            self.server.kf_state.load_from_json(save_data, self.client_address[0])
         for i in range(n_old_frames):
             self.server.broadcaster.send_string("LED MSG del?0")
         i = 0
-        for state in self.server.kf_state["keyframes"]:
-            self.server.broadcaster.send_string("LED MSG add?%s" % state)
-            self.server.broadcaster.send_string("LED MSG time?%s&%s" % (i, self.server.kf_state["frame_times"][i]))
+        for data in self.server.kf_state.kf_data:
+            self.server.broadcaster.send_string("LED MSG add?%s" % data.keyframe)
+            self.server.broadcaster.send_string("LED MSG time?%s&%s" % (i, data.frame_time))
             i += 1
         logger.info("Send %s + %i ZMQ messages" % (n_old_frames, 2 * i))
         return True
@@ -234,6 +493,25 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
                     if ext == ".json":
                         saves.append(name)
         self.wfile.write(json.dumps({"result": "ok", "names": saves}).encode())
+
+    def check_secret(self):
+        message = "this is a test"
+        beauty_threshold = 0.5
+        last_beauty, beauty = self.server.kf_state.get_total_beauty()
+        if beauty > beauty_threshold and abs(last_beauty - beauty) > 0.1:
+            dimness = min(1.0, beauty - beauty_threshold)
+            msg_state = self.server.polybiusSquare.encode_to_colors(message, dimness, N_LEDS)
+            msg = "LED MSG sct?%s" % msg_state
+            self.server.broadcaster.send_string(msg)
+            logger.info("ZMQ message sent: %s" % msg)
+            print("*** ADDING SECRET %s ***" % dimness)
+        elif last_beauty > beauty_threshold > beauty:
+            msg = "LED MSG tcs?0"
+            self.server.broadcaster.send_string(msg)
+            logger.info("ZMQ message sent: %s" % msg)
+            print("*** REMOVING SECRET ***")
+        else:
+            print("secret unchanged, beauty %s, prev beauty %s" % (beauty, last_beauty))
 
     def serve_keyframes(self):
         if self.server.state["source"] != "paint":
@@ -257,11 +535,11 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
             if msg != "":
                 self.server.broadcaster.send_string(msg)
                 logger.info("ZMQ message sent: %s" % msg)
-        self.server.kf_state["last_client"] = self.client_address[0]
+                self.check_secret()
         self.wfile.write(json.dumps({
             "result": "ok",
-            "keyframes": self.server.kf_state["keyframes"],
-            "frame_times": self.server.kf_state["frame_times"]
+            "keyframes": [d.keyframe for d in self.server.kf_state.kf_data],
+            "frame_times": [d.frame_time for d in self.server.kf_state.kf_data]
         }).encode())
 
     def serve_config(self):
@@ -592,7 +870,20 @@ class LEDHttpServer:
         self.server.broadcaster.bind(LEDHttpServer.zmqPort)
         self.server.state = {"source": "embers", "color": "#FFFFFF", "mode": ""}
         self.server.paint_state = {"leds": bytearray(3 * N_LEDS)}
-        self.server.kf_state = {"keyframes": [], "frame_times": [], "last_client": ""}
+        self.server.kf_state = KeyFrameState()
+        self.server.polybiusSquare = PolybiusSquare([
+            ['A', 'B', 'C', 'D', 'E'],
+            ['F', 'G', 'H', 'X', 'I'],  # "Ch" replaced with "X"
+            ['J', 'K', 'L', 'M', 'N'],
+            ['O', 'P', 'R', 'S', 'T'],
+            ['U', 'V', 'X', 'Y', 'Z']
+        ], [
+            (0.0, 1.0, 0.5),    # Red
+            (0.083, 1.0, 0.5),  # Orange
+            (0.167, 1.0, 0.5),  # Yellow
+            (0.333, 1.0, 0.5),  # Green
+            (0.667, 1.0, 0.5)   # Blue
+        ])
 
         try:
             while True:
