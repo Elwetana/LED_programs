@@ -498,7 +498,7 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
         message = "this is a test"
         beauty_threshold = 0.5
         last_beauty, beauty = self.server.kf_state.get_total_beauty()
-        if beauty > beauty_threshold and abs(last_beauty - beauty) > 0.1:
+        if beauty > beauty_threshold:
             dimness = min(1.0, beauty - beauty_threshold)
             msg_state = self.server.polybiusSquare.encode_to_colors(message, dimness, N_LEDS)
             msg = "LED MSG sct?%s" % msg_state
