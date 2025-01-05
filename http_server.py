@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 import base64
 import random
 from datetime import datetime, timedelta
@@ -278,13 +278,13 @@ class KeyFrameState:
     def get_total_time(self):
         return sum([d.frame_time for d in self.kf_data])
 
-    def get_total_beauty(self) -> tuple[float, float]:
+    def get_total_beauty(self) -> tuple[float, float, int]:
         total_score = 0.0
         for kf in self.kf_data:
             # print(kf.beauty_score, kf.keyframe, kf.client)
             total_score += kf.beauty_score
         # result is average beauty multiplied by the number of clients (so adding new client has great impact)
-        res = (self.last_beauty, 0 if len(self.kf_data) == 0 else (total_score / len(self.kf_data)) * len(self.client_times))
+        res = (self.last_beauty, 0 if len(self.kf_data) == 0 else (total_score / len(self.kf_data)), len(self.client_times))
         self.last_beauty = res[1]
         return res
 
@@ -495,23 +495,27 @@ class LEDHttpHandler(BaseHTTPRequestHandler):
         self.wfile.write(json.dumps({"result": "ok", "names": saves}).encode())
 
     def check_secret(self):
-        message = "this is a test"
-        beauty_threshold = 0.5
-        last_beauty, beauty = self.server.kf_state.get_total_beauty()
-        if beauty > beauty_threshold:
-            dimness = min(1.0, beauty - beauty_threshold)
+        message = "hledetevpokojikteryjezdrojemvsehotepla"
+        beauty_threshold = 1.0
+        last_beauty, beauty, n_clients = self.server.kf_state.get_total_beauty()
+        if beauty * n_clients > beauty_threshold:
+            dimness = min(1.0, beauty * n_clients - beauty_threshold)
             msg_state = self.server.polybiusSquare.encode_to_colors(message, dimness, N_LEDS)
             msg = "LED MSG sct?%s" % msg_state
             self.server.broadcaster.send_string(msg)
             logger.info("ZMQ message sent: %s" % msg)
-            print("*** ADDING SECRET %s ***" % dimness)
+            msg = "LED MSG stt?%s" % (n_clients * 1000)
+            self.server.broadcaster.send_string(msg)
+            logger.info("ZMQ message sent: %s" % msg)
+            # print("*** ADDING SECRET %s ***" % dimness)
         elif last_beauty > beauty_threshold > beauty:
             msg = "LED MSG tcs?0"
             self.server.broadcaster.send_string(msg)
             logger.info("ZMQ message sent: %s" % msg)
-            print("*** REMOVING SECRET ***")
+            # print("*** REMOVING SECRET ***")
         else:
-            print("secret unchanged, beauty %s, prev beauty %s" % (beauty, last_beauty))
+            # print("secret unchanged, beauty %s, prev beauty %s" % (beauty, last_beauty))
+            pass
 
     def serve_keyframes(self):
         if self.server.state["source"] != "paint":
@@ -879,8 +883,8 @@ class LEDHttpServer:
             ['U', 'V', 'X', 'Y', 'Z']
         ], [
             (0.0, 1.0, 0.5),    # Red
-            (0.083, 1.0, 0.5),  # Orange
-            (0.167, 1.0, 0.5),  # Yellow
+            (0.043, 1.0, 0.5),  # Orange
+            (0.111, 1.0, 0.5),  # Yellow
             (0.333, 1.0, 0.5),  # Green
             (0.667, 1.0, 0.5)   # Blue
         ])
